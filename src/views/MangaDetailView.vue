@@ -61,65 +61,102 @@
             </div>
           </div>
         </div>
+
         <div v-else>
           <h1>Editar Mangá</h1>
+          <label>Título</label>
           <input
             type="text"
             v-model="editedManga.titulo"
             class="modal-input"
             placeholder="Título"
           />
+
+          <label>URL da Imagem de Capa</label>
+          <input
+            type="url"
+            v-model="editedManga.capaUrl"
+            class="modal-input"
+            placeholder="https://exemplo.com/imagem.jpg"
+          />
+
+          <label>Link para Leitura</label>
           <input
             type="url"
             v-model="editedManga.linkLeitura"
             class="modal-input"
             placeholder="https://exemplo.com/manga/.."
           />
+
+          <label>Gêneros (separados por vírgula)</label>
           <input
             type="text"
             v-model="editedManga.generos"
             class="modal-input"
-            placeholder="Gêneros (separados por vírgula)"
+            placeholder="Ação, Aventura, Fantasia..."
           />
-          <input
-            type="number"
-            v-model.number="editedManga.capitulos"
-            class="modal-input"
-            placeholder="Total de Capítulos"
-          />
-          <input
-            type="number"
-            v-model.number="editedManga.capitulosLidos"
-            class="modal-input"
-            placeholder="Capítulos Lidos"
-          />
+
+          <div class="form-grid">
+            <div>
+              <label>Total de Capítulos</label>
+              <input
+                type="number"
+                v-model.number="editedManga.capitulos"
+                class="modal-input"
+                placeholder="Total de Capítulos"
+              />
+            </div>
+            <div>
+              <label>Capítulos Lidos</label>
+              <input
+                type="number"
+                v-model.number="editedManga.capitulosLidos"
+                class="modal-input"
+                placeholder="Capítulos Lidos"
+              />
+            </div>
+          </div>
+
+          <label>Nomes Alternativos</label>
           <input
             type="text"
             v-model="editedManga.nomesAlternativos"
             class="modal-input"
             placeholder="Nomes Alternativos"
           />
-          <select v-model="editedManga.tipo" class="modal-input">
-            <option>Manga</option>
-            <option>Manhwa</option>
-            <option>Manhua</option>
-            <option>Novel</option>
-            <option>Light Novel</option>
-            <option>One-shot</option>
-            <option>Doujinshi</option>
-          </select>
-          <select v-model="editedManga.status" class="modal-input">
-            <option>Quero Ler</option>
-            <option>Lendo</option>
-            <option>Lido</option>
-            <option>Abandonado</option>
-          </select>
+
+          <div class="form-grid">
+            <div>
+              <label>Tipo</label>
+              <select v-model="editedManga.tipo" class="modal-input">
+                <option>Manga</option>
+                <option>Manhwa</option>
+                <option>Manhua</option>
+                <option>Novel</option>
+                <option>Light Novel</option>
+                <option>One-shot</option>
+                <option>Doujinshi</option>
+              </select>
+            </div>
+            <div>
+              <label>Status</label>
+              <select v-model="editedManga.status" class="modal-input">
+                <option>Quero Ler</option>
+                <option>Lendo</option>
+                <option>Lido</option>
+                <option>Abandonado</option>
+              </select>
+            </div>
+          </div>
+
+          <label>Descrição</label>
           <textarea
             v-model="editedManga.descricao"
             class="modal-textarea"
             placeholder="Descrição"
           ></textarea>
         </div>
+
         <div class="modal-actions">
           <template v-if="!isEditing">
             <button id="update-btn" @click="openUpdateConfirmation" :disabled="isUpdating">
@@ -138,9 +175,11 @@
         <p>{{ manga.descricao }}</p>
       </div>
     </div>
+
     <div v-else class="not-found">
       <h1>Mangá não encontrado</h1>
     </div>
+
     <ConfirmationModal
       v-if="showConfirmationModal"
       :title="confirmationTitle"
@@ -265,7 +304,9 @@ const toggleEditMode = () => {
 
 const salvarEdicao = (showToast = false) => {
   const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]')
+  // IMPORTANTE: usamos o título original (antes da edição) para encontrar o item
   const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
+
   if (index !== -1 && manga.value) {
     mangasSalvos[index] = editedManga.value as Manga
     localStorage.setItem('mangasLidos', JSON.stringify(mangasSalvos))
@@ -340,6 +381,24 @@ watch(
 </script>
 
 <style scoped>
+/* Adicionando grid e labels para o formulário de edição */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+div[v-else] label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--subtle-text-color);
+}
+div[v-else] > label {
+  margin-top: 15px;
+}
+
+/* Estilos existentes */
 #update-btn {
   background-color: var(--primary-color);
   color: white;
