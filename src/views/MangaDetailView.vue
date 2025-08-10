@@ -169,6 +169,7 @@
     <div v-else class="not-found">
       <h1>Mangá não encontrado</h1>
     </div>
+
     <ConfirmationModal
       v-if="showConfirmationModal"
       :title="confirmationTitle"
@@ -211,18 +212,30 @@ const route = useRoute()
 const toast = useToast()
 
 const carregarManga = async () => {
+  console.log('--- DEBUG: INICIANDO CARREGAMENTO NA PÁGINA DE DETALHES ---')
+
   const mangasSalvos = await getListaDeMangas()
-  const mangaSlug = route.params.id as string
+  console.log('1. Mangás carregados do Firestore:', mangasSalvos)
+
+  const mangaSlugDaUrl = route.params.id as string
+  console.log('2. Slug da URL:', mangaSlugDaUrl)
+
   const encontrado = mangasSalvos.find((m) => {
     if (!m || !m.titulo) return false
-    const slug = m.titulo
+    const slugGerado = m.titulo
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
-    return slug === mangaSlug
+    console.log(
+      `--> Comparando: URL ('${mangaSlugDaUrl}') com Slug Gerado ('${slugGerado}') do mangá "${m.titulo}"`,
+    )
+    return slugGerado === mangaSlugDaUrl
   })
+
+  console.log('3. Resultado da busca:', encontrado)
   manga.value = encontrado || null
   editedManga.value = { ...encontrado }
+  console.log('--- FIM DO DEBUG ---')
 }
 
 const salvarEdicao = async (showToast = false) => {
