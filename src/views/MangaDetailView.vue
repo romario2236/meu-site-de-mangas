@@ -1,8 +1,4 @@
 <template>
-  <h1 style="color: yellow; font-size: 32px; background: black; text-align: center; padding: 10px">
-    TESTE DE VERSÃO - SE ESTÁ VENDO ISSO, O ARQUIVO FOI ATUALIZADO
-  </h1>
-
   <div class="detail-wrapper">
     <router-link to="/" class="back-button">&larr; Voltar para a lista</router-link>
 
