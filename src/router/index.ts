@@ -1,5 +1,4 @@
 // src/router/index.ts
-
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import MangaDetailView from '../views/MangaDetailView.vue'
@@ -13,7 +12,7 @@ const router = createRouter({
       component: HomeView
     },
     {
-      // AQUI ESTÁ A CORREÇÃO: Garantindo que o caminho seja exatamente este.
+      // A correção garante que este caminho esteja 100% correto
       path: '/manga/:id',
       name: 'manga-detail',
       component: MangaDetailView,

@@ -8,15 +8,13 @@
   </router-link>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
+import type { Manga } from '@/types';
 
-const props = defineProps({
-  manga: {
-    type: Object,
-    required: true
-  }
-});
+const props = defineProps<{
+  manga: Manga
+}>();
 
 defineEmits(['removerManga']);
 
