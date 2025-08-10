@@ -1,3 +1,5 @@
+# Arquivo: netlify.toml
+
 [[redirects]]
   from = "/api/jikan/*"
   to = "https://api.jikan.moe/v4/:splat"

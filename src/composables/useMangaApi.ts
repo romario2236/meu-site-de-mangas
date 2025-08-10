@@ -4,7 +4,7 @@
 import type { Manga } from '@/types'
 
 export async function fetchMangaData(nomeManga: string) {
-  // AGORA USAMOS OS CAMINHOS DO NOSSO PROXY
+  // <-- MUDANÇA: AGORA USAMOS OS CAMINHOS DO NOSSO PROXY DEFINIDOS NO netlify.toml -->
   const jikanUrl = `/api/jikan/manga?q=${encodeURIComponent(nomeManga)}&limit=5`
   const kitsuUrl = `/api/kitsu/manga?filter[text]=${encodeURIComponent(nomeManga)}&page[limit]=5`
   const mangadexUrl = `/api/mangadex/manga?title=${encodeURIComponent(nomeManga)}&limit=5&includes[]=cover_art`

@@ -191,7 +191,6 @@ import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
 import type { Manga } from '@/types'
 
-// O restante do seu script... (ele não precisa de alterações)
 const searchResults = ref<Manga[]>([])
 const showSelectionModal = ref(false)
 const showManualAddModal = ref(false)
