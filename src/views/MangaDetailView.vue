@@ -246,7 +246,6 @@ const handleConfirmUpdate = async () => {
     return
   }
 
-  // Lógica corrigida para SEMPRE mostrar a seleção
   if (resultados && resultados.length > 0) {
     searchResults.value = resultados
     showSelectionModal.value = true
@@ -375,7 +374,6 @@ watch(
 </script>
 
 <style scoped>
-/* Estilos existentes */
 #update-btn {
   background-color: var(--primary-color);
   color: white;
