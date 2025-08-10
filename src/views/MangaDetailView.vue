@@ -1,4 +1,8 @@
 <template>
+  <h1 style="color: yellow; font-size: 32px; background: black; text-align: center; padding: 10px">
+    TESTE DE VERSÃO - SE ESTÁ VENDO ISSO, O ARQUIVO FOI ATUALIZADO
+  </h1>
+
   <div class="detail-wrapper">
     <router-link to="/" class="back-button">&larr; Voltar para a lista</router-link>
 
@@ -231,7 +235,6 @@ const openUpdateConfirmation = () => {
   showConfirmationModal.value = true
 }
 
-// <-- AQUI ESTÁ A LÓGICA DE ATUALIZAÇÃO CORRIGIDA -->
 const handleConfirmUpdate = async () => {
   showConfirmationModal.value = false
   if (!manga.value) return
@@ -247,7 +250,7 @@ const handleConfirmUpdate = async () => {
     return
   }
 
-  // A MUDANÇA: Se encontrou QUALQUER resultado, abre o modal de seleção.
+  // Lógica corrigida para SEMPRE mostrar a seleção
   if (resultados && resultados.length > 0) {
     searchResults.value = resultados
     showSelectionModal.value = true
@@ -376,6 +379,7 @@ watch(
 </script>
 
 <style scoped>
+/* Estilos existentes */
 #update-btn {
   background-color: var(--primary-color);
   color: white;
