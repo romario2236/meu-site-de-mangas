@@ -1,287 +1,346 @@
 <template>
-  <div class="detail-wrapper">
-    <router-link to="/" class="back-button">&larr; Voltar para a lista</router-link>
+  <div class="home-wrapper">
+    <div class="header-section">
+      <h1>Gerenciador de Mangás</h1>
+      <div class="add-manga-container">
+        <input type="text" id="manga-input" placeholder="Digite o nome do mangá" v-model="mangaInput" @keyup.enter="buscarManga">
+        <button id="add-button" @click="buscarManga" :disabled="isLoading">
+          {{ isLoading ? 'Buscando...' : 'Buscar' }}
+        </button>
+        <button id="manual-add-button" @click="showManualAddModal = true">Adicionar Manualmente</button>
+      </div>
+      <p class="search-tip">Dica: Se não encontrar, tente o título em inglês ou no idioma original.</p>
+    </div>
 
-    <div v-if="manga" class="manga-detail-content">
-      <img :src="manga.capaUrl" :alt="manga.titulo" class="detail-cover">
-      <div class="detail-info">
-        <div v-if="!isEditing">
-          <h1>{{ manga.titulo }}</h1>
-          <div class="info-group">
-            <div><strong>Tipo:</strong> {{ manga.tipo }}</div>
-            <div>
-              <strong>Status:</strong>
-              <div class="status-selector">
-                <span class="status-tag" :class="{ selected: editedManga.status === 'Quero Ler' }" @click="changeStatus('Quero Ler')">Quero Ler</span>
-                <span class="status-tag" :class="{ selected: editedManga.status === 'Lendo' }" @click="changeStatus('Lendo')">Lendo</span>
-                <span class="status-tag" :class="{ selected: editedManga.status === 'Lido' }" @click="changeStatus('Lido')">Lido</span>
-                <span class="status-tag" :class="{ selected: editedManga.status === 'Abandonado' }" @click="changeStatus('Abandonado')">Abandonado</span>
-              </div>
+    <div class="page-container">
+      <aside class="sidebar">
+        <h3>Filtros e Ordenação</h3>
+        <div class="organize-group">
+          <label for="search-local">Pesquisar por Nome:</label>
+          <input
+            type="search"
+            id="search-local"
+            placeholder="Filtrar na sua lista..."
+            v-model="filtroNome"
+          >
+        </div>
+        <div class="organize-group">
+            <label>Gerenciar Lista</label>
+            <div class="io-buttons">
+                <button @click="exportarLista">Exportar Lista</button>
+                <button @click="triggerImportar">Importar Lista</button>
+                <input type="file" ref="fileInput" @change="importarLista" accept=".json" style="display: none;" />
             </div>
-            <div><strong>Capítulos:</strong> {{ manga.capitulos }}</div>
-            <div class="info-field">
-              <strong class="info-label">Capítulos Lidos:</strong>
-              <div class="chapter-counter">
-                <button class="count-btn" @click="decrementarCapitulo">-</button>
-                <span class="chapters-read-count">{{ editedManga.capitulosLidos || 0 }}</span>
-                <button class="count-btn" @click="incrementarCapitulo">+</button>
-              </div>
-            </div>
-            <div><strong>Gêneros:</strong> {{ manga.generos }}</div>
-            <div><strong>Nomes Alternativos:</strong> {{ manga.nomesAlternativos }}</div>
-            <div v-if="manga.linkLeitura">
-              <strong>Onde Ler:</strong>
-              <a :href="manga.linkLeitura" target="_blank" rel="noopener noreferrer" class="read-link">Acessar Link</a>
-            </div>
+        </div>
+        <div class="organize-group">
+          <label for="sort-by">Ordenar por:</label>
+          <select id="sort-by" v-model="sortBy">
+            <option value="titulo-asc">Título (A-Z)</option>
+            <option value="titulo-desc">Título (Z-A)</option>
+            <option value="capitulos-asc">Capítulos (Crescente)</option>
+            <option value="capitulos-desc">Capítulos (Decrescente)</option>
+          </select>
+        </div>
+        <div class="organize-group">
+          <label>Filtrar por Tipo:</label>
+          <div class="filter-container">
+            <span class="filter-tag" :class="{ selected: tipoSelecionado === 'todos' }" @click="setTipo('todos')">Todos</span>
+            <span class="filter-tag" :class="{ selected: tipoSelecionado === 'Manga' }" @click="setTipo('Manga')">Manga</span>
+            <span class="filter-tag" :class="{ selected: tipoSelecionado === 'Manhwa' }" @click="setTipo('Manhwa')">Manhwa</span>
+            <span class="filter-tag" :class="{ selected: tipoSelecionado === 'Manhua' }" @click="setTipo('Manhua')">Manhua</span>
+            <span class="filter-tag" :class="{ selected: tipoSelecionado === 'Novel' }" @click="setTipo('Novel')">Novel</span>
           </div>
         </div>
-        <div v-else>
-            <h1>Editar Mangá</h1>
-            <input type="text" v-model="editedManga.titulo" class="modal-input" placeholder="Título">
-            <input type="url" v-model="editedManga.linkLeitura" class="modal-input" placeholder="https://exemplo.com/manga/..">
-            <input type="text" v-model="editedManga.generos" class="modal-input" placeholder="Gêneros (separados por vírgula)">
-            <input type="number" v-model.number="editedManga.capitulos" class="modal-input" placeholder="Total de Capítulos">
-            <input type="number" v-model.number="editedManga.capitulosLidos" class="modal-input" placeholder="Capítulos Lidos">
-            <input type="text" v-model="editedManga.nomesAlternativos" class="modal-input" placeholder="Nomes Alternativos">
-            <select v-model="editedManga.tipo" class="modal-input">
-              <option>Manga</option><option>Manhwa</option><option>Manhua</option><option>Novel</option><option>Light Novel</option><option>One-shot</option><option>Doujinshi</option>
-            </select>
-            <select v-model="editedManga.status" class="modal-input">
-              <option>Quero Ler</option><option>Lendo</option><option>Lido</option><option>Abandonado</option>
-            </select>
-            <textarea v-model="editedManga.descricao" class="modal-textarea" placeholder="Descrição"></textarea>
+        <div class="organize-group">
+          <label>Filtrar por Status:</label>
+          <div class="filter-container">
+            <span class="filter-status-tag" :class="{ selected: statusSelecionado === 'todos' }" @click="setStatus('todos')">Todos</span>
+            <span class="filter-status-tag" :class="{ selected: statusSelecionado === 'Quero Ler' }" @click="setStatus('Quero Ler')">Quero Ler</span>
+            <span class="filter-status-tag" :class="{ selected: statusSelecionado === 'Lendo' }" @click="setStatus('Lendo')">Lendo</span>
+            <span class="filter-status-tag" :class="{ selected: statusSelecionado === 'Lido' }" @click="setStatus('Lido')">Lido</span>
+            <span class="filter-status-tag" :class="{ selected: statusSelecionado === 'Abandonado' }" @click="setStatus('Abandonado')">Abandonado</span>
+          </div>
         </div>
-        <div class="modal-actions">
-          <template v-if="!isEditing">
-            <button id="update-btn" @click="openUpdateConfirmation" :disabled="isUpdating">
-              {{ isUpdating ? 'Atualizando...' : 'Atualizar Automaticamente' }}
-            </button>
-            <button id="edit-btn" @click="toggleEditMode">Editar Detalhes</button>
+        <div class="organize-group">
+          <label>Filtrar por Gênero:</label>
+          <div class="filter-container">
+            <span class="filter-tag" :class="{ selected: generoSelecionado.length === 0 }" @click="setGenero([])">Todos</span>
+            <span class="filter-tag" v-for="genero in todosOsGenerosOrdenados" :key="genero" :class="{ selected: generoSelecionado.includes(genero) }" @click="toggleGenero(genero)">
+              {{ genero }}
+            </span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <h2>Minha Lista de Mangás</h2>
+        <ul id="manga-list">
+          <template v-if="isLoading && mangasLidos.length === 0">
+            <CardSkeleton v-for="n in 3" :key="n" />
           </template>
           <template v-else>
-            <button class="cancel-btn" @click="toggleEditMode">Cancelar</button>
-            <button id="save-edit-btn" @click="salvarEdicao(true)">Salvar Detalhes</button>
+            <MangaCard
+              v-for="(manga) in mangasFiltradosEOrdenados"
+              :key="manga.titulo"
+              :manga="manga"
+              @removerManga="removerManga"
+            />
           </template>
-        </div>
-      </div>
-      <div class="description" v-if="!isEditing">
-        <h2>Sinopse</h2>
-        <p>{{ manga.descricao }}</p>
-      </div>
-    </div>
-    <div v-else class="not-found">
-      <h1>Mangá não encontrado</h1>
+        </ul>
+      </main>
     </div>
 
-    <ConfirmationModal
-      v-if="showConfirmationModal"
-      :title="confirmationTitle"
-      :message="confirmationMessage"
-      confirm-text="Atualizar"
-      @confirm="handleConfirmUpdate"
-      @cancel="showConfirmationModal = false"
-    />
     <MangaSelectionModal
       v-if="showSelectionModal"
       :results="searchResults"
-      action-text="Selecionar"
       @close="closeSelectionModal"
-      @mangaSelected="handleMangaSelectedForUpdate"
+      @mangaSelected="adicionarMangaSelecionado"
+    />
+    <ManualAddModal
+      v-if="showManualAddModal"
+      @close="showManualAddModal = false"
+      @save="adicionarMangaManual"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, onMounted, computed } from 'vue';
+import MangaCard from '@/components/MangaCard.vue';
+import CardSkeleton from '@/components/CardSkeleton.vue';
+import MangaSelectionModal from '@/components/MangaSelectionModal.vue';
+import ManualAddModal from '@/components/ManualAddModal.vue';
 import { useToast } from "vue-toastification";
 import { fetchMangaData } from '@/composables/useMangaApi';
 import type { Manga } from '@/types';
-import ConfirmationModal from '@/components/ConfirmationModal.vue';
-import MangaSelectionModal from '@/components/MangaSelectionModal.vue';
 
-const manga = ref<Manga | null>(null);
-const editedManga = ref<Partial<Manga>>({});
-const isEditing = ref(false);
-const isUpdating = ref(false);
-
-const showConfirmationModal = ref(false);
-const confirmationTitle = ref('');
-const confirmationMessage = ref('');
-const showSelectionModal = ref(false);
 const searchResults = ref<Manga[]>([]);
-
-const route = useRoute();
+const showSelectionModal = ref(false);
+const showManualAddModal = ref(false);
 const toast = useToast();
+const mangaInput = ref('');
+const mangasLidos = ref<Manga[]>([]);
+const todosOsGeneros = ref(new Set<string>());
+const generoSelecionado = ref<string[]>([]);
+const statusSelecionado = ref('todos');
+const tipoSelecionado = ref('todos');
+const sortBy = ref('titulo-asc');
+const isLoading = ref(false);
+const filtroNome = ref('');
+const fileInput = ref<HTMLInputElement | null>(null);
 
-const openUpdateConfirmation = () => {
-  if (!manga.value) return;
-  confirmationTitle.value = 'Confirmar Atualização';
-  if (manga.value.isManual) {
-    confirmationMessage.value = `Este item foi adicionado <strong>manualmente</strong>. Atualizar com dados da internet pode sobrescrever suas informações com as de outro mangá com nome parecido.<br><br>Deseja continuar?`;
-  } else {
-    confirmationMessage.value = 'Isso buscará as informações mais recentes nas APIs e atualizará os dados deste item. Seus dados pessoais (status, capítulos lidos) serão mantidos.<br><br>Deseja continuar?';
-  }
-  showConfirmationModal.value = true;
+const adicionarMangaManual = (novoManga: Manga) => {
+  adicionarMangaSelecionado(novoManga);
+  showManualAddModal.value = false;
 };
 
-// LÓGICA DE ATUALIZAÇÃO CORRIGIDA
-const handleConfirmUpdate = async () => {
-  showConfirmationModal.value = false;
-  if (!manga.value) return;
+const salvarMangas = () => {
+  localStorage.setItem('mangasLidos', JSON.stringify(mangasLidos.value));
+  salvarGeneros();
+};
 
-  isUpdating.value = true;
-  toast.info(`Buscando por atualizações para "${manga.value.titulo}"...`);
+const carregarMangas = () => {
+  const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]');
+  if (mangasSalvos) {
+    mangasLidos.value = mangasSalvos;
+    todosOsGeneros.value.clear();
+    mangasSalvos.forEach(manga => {
+      if (manga.generos && manga.generos !== 'N/A') {
+        manga.generos.split(', ').forEach((g: string) => todosOsGeneros.value.add(g.trim()));
+      }
+    });
+  }
+};
 
-  const { data: resultados, error } = await fetchMangaData(manga.value.titulo);
-  isUpdating.value = false;
+const salvarGeneros = () => {
+  localStorage.setItem('todosOsGeneros', JSON.stringify(Array.from(todosOsGeneros.value)));
+};
 
+const carregarGeneros = () => {
+  const generosSalvos = JSON.parse(localStorage.getItem('todosOsGeneros') || '[]');
+  if (generosSalvos) {
+    todosOsGeneros.value = new Set(generosSalvos);
+  }
+};
+
+const buscarManga = async () => {
+  const nomeManga = mangaInput.value.trim();
+  if (nomeManga === '') return;
+  isLoading.value = true;
+  const { data: resultados, error } = await fetchMangaData(nomeManga);
+  isLoading.value = false;
   if (error) {
-    toast.error("Falha ao buscar atualizações.");
-    return;
-  }
-
-  // A MUDANÇA PRINCIPAL: Se encontrou QUALQUER resultado, abre o modal de seleção.
-  if (resultados && resultados.length > 0) {
-    searchResults.value = resultados;
-    showSelectionModal.value = true;
+    toast.warning(error);
+  } else if (resultados && resultados.length > 0) {
+    if (resultados.length > 1) {
+      searchResults.value = resultados;
+      showSelectionModal.value = true;
+    } else {
+      adicionarMangaSelecionado(resultados[0]);
+    }
   } else {
-    toast.warning("Nenhuma atualização encontrada para este título.");
+    toast.info("Nenhum resultado encontrado para sua busca.");
   }
 };
 
-const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
-    if (!manga.value) return;
-    const mangaParaSalvar: Manga = {
-        ...selectedManga,
-        status: manga.value.status,
-        capitulosLidos: manga.value.capitulosLidos,
-        linkLeitura: manga.value.linkLeitura,
-        isManual: false,
-    };
-
-    editedManga.value = mangaParaSalvar;
-    salvarEdicao(false); // Salva em segundo plano
-    toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`);
-    closeSelectionModal();
+const adicionarMangaSelecionado = (manga: Manga) => {
+  if (mangasLidos.value.some(item => item.titulo.toLowerCase() === manga.titulo.toLowerCase())) {
+    toast.info(`"${manga.titulo}" já está na sua lista.`);
+  } else {
+    mangasLidos.value.push(manga);
+    if (manga.generos && manga.generos !== 'N/A') {
+      manga.generos.split(', ').forEach((genero: string) => todosOsGeneros.value.add(genero.trim()));
+    }
+    salvarMangas();
+    toast.success(`"${manga.titulo}" foi adicionado à lista!`);
+  }
+  mangaInput.value = '';
+  closeSelectionModal();
 };
 
 const closeSelectionModal = () => {
-    showSelectionModal.value = false;
-    searchResults.value = [];
+  showSelectionModal.value = false;
+  searchResults.value = [];
 };
 
-const carregarManga = () => {
-  const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]');
-  const mangaSlug = route.params.id as string;
-  const encontrado = mangasSalvos.find(m => {
-    if (!m || !m.titulo) return false;
-    const slug = m.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    return slug === mangaSlug;
+const exportarLista = () => {
+  if (mangasLidos.value.length === 0) {
+    toast.info("Sua lista está vazia. Adicione mangás para exportar.");
+    return;
+  }
+  const dataStr = JSON.stringify(mangasLidos.value, null, 2);
+  const blob = new Blob([dataStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'minha-lista-de-mangas.json';
+  link.click();
+  URL.revokeObjectURL(url);
+  toast.success("Lista exportada com sucesso!");
+};
+
+const triggerImportar = () => {
+  fileInput.value?.click();
+};
+
+const importarLista = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const content = e.target?.result;
+      if (typeof content !== 'string') throw new Error("Conteúdo do arquivo inválido.");
+      const novaLista: Manga[] = JSON.parse(content);
+      if (!Array.isArray(novaLista) || (novaLista.length > 0 && !novaLista[0].titulo)) {
+        throw new Error("Formato do arquivo JSON inválido.");
+      }
+      mangasLidos.value = novaLista;
+      salvarMangas();
+      carregarMangas();
+      toast.success("Lista importada e substituída com sucesso!");
+    } catch (error) {
+      console.error("Erro ao importar arquivo:", error);
+      toast.error("Falha ao importar. Verifique se o arquivo é um JSON válido.");
+    } finally {
+      if (target) target.value = '';
+    }
+  };
+  reader.readAsText(file);
+};
+
+const mangasFiltradosEOrdenados = computed(() => {
+  let mangas = [...mangasLidos.value];
+  const termoBusca = filtroNome.value.trim().toLowerCase();
+  if (termoBusca) {
+    mangas = mangas.filter(manga => manga.titulo.toLowerCase().includes(termoBusca));
+  }
+  if (tipoSelecionado.value !== 'todos') {
+    mangas = mangas.filter(manga => manga.tipo === tipoSelecionado.value);
+  }
+  if (generoSelecionado.value.length > 0) {
+    mangas = mangas.filter(manga => {
+      if (!manga.generos || manga.generos === 'N/A') return false;
+      const mangaGeneros = manga.generos.split(', ').map((g: string) => g.trim());
+      return generoSelecionado.value.every(g => mangaGeneros.includes(g));
+    });
+  }
+  if (statusSelecionado.value !== 'todos') {
+    mangas = mangas.filter(manga => manga.status === statusSelecionado.value);
+  }
+  mangas.sort((a: Manga, b: Manga) => {
+    if (sortBy.value === 'titulo-asc') return a.titulo.localeCompare(b.titulo);
+    if (sortBy.value === 'titulo-desc') return b.titulo.localeCompare(a.titulo);
+    const capsA = a.capitulos === 'N/A' ? Infinity : Number(a.capitulos);
+    const capsB = b.capitulos === 'N/A' ? Infinity : Number(b.capitulos);
+    if (sortBy.value === 'capitulos-asc') return capsA - capsB;
+    if (sortBy.value === 'capitulos-desc') return capsB - capsA;
+    return 0;
   });
-  manga.value = encontrado || null;
-  editedManga.value = { ...encontrado };
-};
-
-const toggleEditMode = () => {
-  isEditing.value = !isEditing.value;
-  if (!isEditing.value) { editedManga.value = { ...manga.value }; }
-};
-
-const salvarEdicao = (showToast = false) => {
-  const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]');
-  const index = mangasSalvos.findIndex(m => m.titulo === manga.value?.titulo);
-  if (index !== -1 && manga.value) {
-    mangasSalvos[index] = editedManga.value as Manga;
-    localStorage.setItem('mangasLidos', JSON.stringify(mangasSalvos));
-    manga.value = { ...editedManga.value } as Manga;
-    if (showToast) {
-      isEditing.value = false;
-      toast.success("Mangá atualizado com sucesso!");
-    }
-  } else {
-    toast.error("Erro ao encontrar o mangá para salvar.");
-  }
-};
-
-const changeStatus = (newStatus: Manga['status']) => {
-  if (editedManga.value) {
-    editedManga.value.status = newStatus;
-    salvarEdicao();
-  }
-};
-
-const incrementarCapitulo = () => {
-  if (editedManga.value && editedManga.value.capitulosLidos !== undefined && editedManga.value.capitulos) {
-    const totalCapitulos = Number(editedManga.value.capitulos);
-    if (isNaN(totalCapitulos) || editedManga.value.capitulosLidos < totalCapitulos) {
-      editedManga.value.capitulosLidos++;
-      salvarEdicao();
-    }
-  }
-};
-
-const decrementarCapitulo = () => {
-  if (editedManga.value && editedManga.value.capitulosLidos && editedManga.value.capitulosLidos > 0) {
-    editedManga.value.capitulosLidos--;
-    salvarEdicao();
-  }
-};
-
-const statusClass = computed(() => {
-  if (!manga.value) return '';
-  switch (manga.value.status) {
-    case 'Lendo': return 'reading';
-    case 'Lido': return 'read';
-    case 'Quero Ler': return 'planned';
-    case 'Abandonado': return 'abandoned';
-    default: return '';
-  }
+  return mangas;
 });
 
-onMounted(() => { carregarManga(); });
-watch(() => route.params.id, () => { carregarManga(); });
+const todosOsGenerosOrdenados = computed(() => Array.from(todosOsGeneros.value).sort());
+
+const removerManga = (mangaParaRemover: Manga) => {
+  mangasLidos.value = mangasLidos.value.filter(manga => manga !== mangaParaRemover);
+  salvarMangas();
+  toast.info(`"${mangaParaRemover.titulo}" foi removido da lista.`);
+};
+
+const toggleGenero = (genero: string) => {
+  const index = generoSelecionado.value.indexOf(genero);
+  if (index > -1) {
+    generoSelecionado.value.splice(index, 1);
+  } else {
+    generoSelecionado.value.push(genero);
+  }
+};
+
+const setGenero = (generos: string[]) => {
+  generoSelecionado.value = generos;
+};
+
+const setStatus = (status: string) => {
+  statusSelecionado.value = status;
+};
+
+const setTipo = (tipo: string) => {
+  tipoSelecionado.value = tipo;
+};
+
+onMounted(() => {
+  carregarMangas();
+});
 </script>
 
 <style scoped>
-#update-btn { background-color: var(--primary-color); color: white; }
-#update-btn:hover { background-color: #2980b9; }
-#update-btn:disabled { background-color: var(--border-color); cursor: not-allowed; }
-.read-link { background-color: var(--primary-color); color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: background-color 0.2s; }
-.read-link:hover { background-color: #2980b9; }
-.status-selector { display: flex; flex-wrap: wrap; gap: 10px; }
-.status-tag { padding: 6px 14px; border-radius: 20px; font-weight: 600; color: var(--subtle-text-color); background-color: var(--border-color); cursor: pointer; transition: all 0.2s ease-in-out; border: 2px solid transparent; }
-.status-tag:hover { color: white; background-color: var(--subtle-text-color); }
-.status-tag.selected { color: white; border: 2px solid white; }
-.status-tag.selected[class*="Quero Ler"] { background-color: var(--status-planned-color); border-color: var(--status-planned-color); }
-.status-tag.selected[class*="Lendo"] { background-color: var(--status-reading-color); border-color: var(--status-reading-color); }
-.status-tag.selected[class*="Lido"] { background-color: var(--status-read-color); border-color: var(--status-read-color); }
-.status-tag.selected[class*="Abandonado"] { background-color: var(--status-abandoned-color); border-color: var(--status-abandoned-color); }
-.detail-wrapper { max-width: 900px; margin: 40px auto; padding: 30px; color: var(--text-color); background-color: var(--card-bg-color); border-radius: 15px; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); }
-.back-button { display: inline-block; margin-bottom: 30px; background-color: var(--bg-color); padding: 10px 25px; border-radius: 10px; color: var(--text-color); text-decoration: none; font-weight: 600; transition: background-color 0.3s ease; }
-.back-button:hover { background-color: var(--border-color); }
-.manga-detail-content { display: grid; grid-template-columns: 250px 1fr; gap: 40px; align-items: start; }
-.detail-cover { width: 100%; height: auto; object-fit: cover; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); }
-.detail-info h1 { margin-top: 0; margin-bottom: 25px; font-size: 2.5rem; color: var(--primary-color); line-height: 1.2; }
-.info-group > div { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; }
-.info-group > div:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-.info-group strong { font-weight: 600; color: var(--subtle-text-color); margin-right: 8px; min-width: 150px; flex-shrink: 0; }
-.description { grid-column: 1 / -1; line-height: 1.8; text-align: justify; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color); }
-.description h2 { margin-top: 0; }
-.not-found { text-align: center; margin-top: 50px; }
-.info-field { display: flex; align-items: center; gap: 15px; }
-.chapter-counter { display: flex; align-items: center; gap: 10px; }
-.count-btn { background-color: var(--border-color); color: var(--text-color); border: none; border-radius: 8px; width: 35px; height: 35px; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: background-color 0.2s; display: flex; align-items: center; justify-content: center; }
-.count-btn:hover { background-color: var(--subtle-text-color); }
-.chapters-read-count { font-size: 1.2rem; font-weight: bold; min-width: 40px; text-align: center; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 30px; }
-.modal-actions button { padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; transition: background-color 0.3s ease; }
-#edit-btn { background-color: var(--edit-color); color: #333; }
-#edit-btn:hover { background-color: #d35400; }
-#save-edit-btn { background-color: var(--save-color); color: white; }
-#save-edit-btn:hover { background-color: #27ae60; }
-.cancel-btn { background-color: var(--remove-color); color: white; }
-.cancel-btn:hover { background-color: #c0392b; }
-.modal-input, .modal-textarea, select { width: 100%; margin-bottom: 15px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); font-size: 16px; box-sizing: border-box; }
-.modal-textarea { resize: vertical; min-height: 120px; }
+#search-local { width: 100%; padding: 10px; font-size: 14px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); border-radius: 8px; }
+.home-wrapper { max-width: 1400px; margin: 0 auto; padding: 20px; }
+.header-section { text-align: center; margin-bottom: 30px; }
+.add-manga-container { display: flex; justify-content: center; align-items: center; gap: 10px; }
+#manual-add-button { background-color: var(--card-bg-color); border: 1px solid var(--border-color); color: var(--text-color); }
+#manual-add-button:hover { background-color: var(--border-color); }
+.page-container { display: flex; align-items: flex-start; gap: 30px; }
+.sidebar { flex: 0 0 280px; background-color: var(--card-bg-color); padding: 20px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+.sidebar h3 { margin-top: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+.organize-group { margin-bottom: 25px; }
+.organize-group label { display: block; margin-bottom: 10px; font-weight: 600; color: var(--subtle-text-color); }
+select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); font-size: 14px; cursor: pointer; outline: none; }
+.filter-container { display: flex; flex-wrap: wrap; gap: 8px; }
+.filter-tag, .filter-status-tag { background-color: var(--border-color); color: var(--subtle-text-color); font-size: 14px; padding: 6px 12px; border-radius: 20px; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+.filter-tag:hover, .filter-status-tag:hover { background-color: var(--subtle-text-color); color: white; }
+.filter-tag.selected { background-color: var(--primary-color); color: white; font-weight: bold; }
+.filter-status-tag.selected[data-status="todos"] { background-color: var(--primary-color); color: white; font-weight: bold; }
+.filter-status-tag.selected[data-status="Lendo"] { background-color: var(--status-reading-color); color: white; font-weight: bold; }
+.filter-status-tag.selected[data-status="Lido"] { background-color: var(--status-read-color); color: white; font-weight: bold; }
+.filter-status-tag.selected[data-status="Quero Ler"] { background-color: var(--status-planned-color); color: white; font-weight: bold; }
+.filter-status-tag.selected[data-status="Abandonado"] { background-color: var(--status-abandoned-color); color: white; font-weight: bold; }
+.main-content { flex: 1; }
+.main-content h2 { text-align: center; margin-top: 0; }
+#manga-list { list-style-type: none; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; }
+.search-tip { margin-top: 15px; font-size: 0.9rem; color: var(--subtle-text-color); }
+.io-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 </style>
