@@ -6,7 +6,6 @@ import type { Manga } from '@/types';
 export async function fetchMangaData(nomeManga: string) {
   const jikanUrl = `/api/jikan/manga?q=${encodeURIComponent(nomeManga)}&limit=5`;
   const kitsuUrl = `/api/kitsu/manga?filter[text]=${encodeURIComponent(nomeManga)}&page[limit]=5`;
-  // Adicionado o 'includes[]=cover_art' para que a MangaDex nos envie os dados da capa
   const mangadexUrl = `/api/mangadex/manga?title=${encodeURIComponent(nomeManga)}&limit=5&includes[]=cover_art`;
 
   try {
@@ -19,26 +18,14 @@ export async function fetchMangaData(nomeManga: string) {
 
     let todosOsResultados: Manga[] = [];
 
-    // Processando resultado da Jikan
     if (responses[0].status === 'fulfilled' && responses[0].value.data) {
-      const resultadosJikan = responses[0].value.data.map(formatarDadosJikan);
-      todosOsResultados.push(...resultadosJikan);
+      todosOsResultados.push(...responses[0].value.data.map(formatarDadosJikan));
     }
-
-    // Processando resultado da Kitsu
     if (responses[1].status === 'fulfilled' && responses[1].value.data) {
-      const resultadosKitsu = responses[1].value.data.map(formatarDadosKitsu);
-      todosOsResultados.push(...resultadosKitsu);
+      todosOsResultados.push(...responses[1].value.data.map(formatarDadosKitsu));
     }
-
-    // Processando resultado da MangaDex
     if (responses[2].status === 'fulfilled' && responses[2].value.data) {
-        const resultadosMangaDex = responses[2].value.data.map((item: any) => {
-            // A lógica agora procura pela capa nos dados que a API incluiu na resposta
-            const coverArt = item.relationships.find((rel: any) => rel.type === 'cover_art');
-            return formatarDadosMangaDex(item, coverArt?.attributes?.fileName || '');
-        });
-        todosOsResultados.push(...resultadosMangaDex);
+      todosOsResultados.push(...responses[2].value.data.map(formatarDadosMangaDex));
     }
 
     if (todosOsResultados.length === 0) {
@@ -53,7 +40,6 @@ export async function fetchMangaData(nomeManga: string) {
     return { data: null, error: "Ocorreu um erro de conexão. Verifique sua internet." };
   }
 }
-
 
 function formatarDadosJikan(resultado: any): Manga {
   const tipo = resultado.type ? resultado.type.charAt(0).toUpperCase() + resultado.type.slice(1) : 'Manga';
@@ -81,17 +67,19 @@ function formatarDadosKitsu(resultado: any): Manga {
   };
 }
 
-function formatarDadosMangaDex(resultado: any, coverFileName: string): Manga {
+// <-- LÓGICA DA CAPA CORRIGIDA AQUI -->
+function formatarDadosMangaDex(resultado: any): Manga {
+    const coverArt = resultado.relationships.find((rel: any) => rel.type === 'cover_art');
+    const coverFileName = coverArt?.attributes?.fileName;
+    const capaUrl = coverFileName
+        ? `https://uploads.mangadex.org/covers/${resultado.id}/${coverFileName}`
+        : ''; // Se não encontrar, a URL fica vazia
+
     const titles = resultado.attributes.title;
     const descriptions = resultado.attributes.description;
     const tituloPrincipal = titles.en || titles['pt-br'] || titles.es || titles['ja-ro'] || Object.values(titles)[0];
     const descricaoPrincipal = descriptions.en || descriptions['pt-br'] || descriptions.es || Object.values(descriptions)[0] || 'Descrição não disponível.';
     const tipo = resultado.attributes.publicationDemographic || 'Manga';
-
-    // Lógica corrigida para construir a URL da capa
-    const capaUrl = coverFileName
-        ? `https://uploads.mangadex.org/covers/${resultado.id}/${coverFileName}`
-        : ''; // Se não houver capa, a URL ficará vazia
 
     return {
         titulo: tituloPrincipal,

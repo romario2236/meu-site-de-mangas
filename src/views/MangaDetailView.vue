@@ -169,7 +169,6 @@
     <div v-else class="not-found">
       <h1>Mangá não encontrado</h1>
     </div>
-
     <ConfirmationModal
       v-if="showConfirmationModal"
       :title="confirmationTitle"
@@ -193,7 +192,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
-import { getListaDeMangas, salvarListaDeMangas } from '@/firebase/firestoreService' // <-- IMPORTAMOS AS FUNÇÕES DO FIRESTORE
+import { getListaDeMangas, salvarListaDeMangas } from '@/firebase/firestoreService'
 import type { Manga } from '@/types'
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
@@ -212,8 +211,7 @@ const route = useRoute()
 const toast = useToast()
 
 const carregarManga = async () => {
-  // LÓGICA DE CARREGAMENTO ATUALIZADA
-  const mangasSalvos = await getListaDeMangas() // <-- BUSCA DO FIRESTORE
+  const mangasSalvos = await getListaDeMangas()
   const mangaSlug = route.params.id as string
   const encontrado = mangasSalvos.find((m) => {
     if (!m || !m.titulo) return false
@@ -228,15 +226,13 @@ const carregarManga = async () => {
 }
 
 const salvarEdicao = async (showToast = false) => {
-  // LÓGICA DE SALVAMENTO ATUALIZADA
-  const mangasSalvos = await getListaDeMangas() // <-- BUSCA DO FIRESTORE
+  const mangasSalvos = await getListaDeMangas()
   const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
 
   if (index !== -1 && manga.value) {
     mangasSalvos[index] = editedManga.value as Manga
-
     try {
-      await salvarListaDeMangas(mangasSalvos) // <-- SALVA NO FIRESTORE
+      await salvarListaDeMangas(mangasSalvos)
       manga.value = { ...editedManga.value } as Manga
       if (showToast) {
         isEditing.value = false
@@ -251,57 +247,6 @@ const salvarEdicao = async (showToast = false) => {
   }
 }
 
-const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
-  if (!manga.value) return
-  const mangaParaSalvar: Manga = {
-    ...selectedManga,
-    status: manga.value.status,
-    capitulosLidos: manga.value.capitulosLidos,
-    linkLeitura: manga.value.linkLeitura,
-    isManual: false,
-  }
-  editedManga.value = mangaParaSalvar
-  salvarEdicao(false)
-  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
-  closeSelectionModal()
-}
-
-// As outras funções que chamam 'salvarEdicao' agora funcionarão com Firestore automaticamente
-const openUpdateConfirmation = () => {
-  /* ...código existente... */
-}
-const handleConfirmUpdate = async () => {
-  /* ...código existente... */
-}
-const closeSelectionModal = () => {
-  /* ...código existente... */
-}
-const toggleEditMode = () => {
-  /* ...código existente... */
-}
-const changeStatus = (newStatus: Manga['status']) => {
-  /* ...código existente... */
-}
-const incrementarCapitulo = () => {
-  /* ...código existente... */
-}
-const decrementarCapitulo = () => {
-  /* ...código existente... */
-}
-const statusClass = computed(() => {
-  /* ...código existente... */
-})
-onMounted(() => {
-  carregarManga()
-})
-watch(
-  () => route.params.id,
-  () => {
-    carregarManga()
-  },
-)
-
-// Colando o resto das funções para garantir
 const openUpdateConfirmation = () => {
   if (!manga.value) return
   confirmationTitle.value = 'Confirmar Atualização'
@@ -313,6 +258,7 @@ const openUpdateConfirmation = () => {
   }
   showConfirmationModal.value = true
 }
+
 const handleConfirmUpdate = async () => {
   showConfirmationModal.value = false
   if (!manga.value) return
@@ -331,22 +277,41 @@ const handleConfirmUpdate = async () => {
     toast.warning('Nenhuma atualização encontrada para este título.')
   }
 }
+
+const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
+  if (!manga.value) return
+  const mangaParaSalvar: Manga = {
+    ...selectedManga,
+    status: manga.value.status,
+    capitulosLidos: manga.value.capitulosLidos,
+    linkLeitura: manga.value.linkLeitura,
+    isManual: false,
+  }
+  editedManga.value = mangaParaSalvar
+  salvarEdicao(false)
+  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
+  closeSelectionModal()
+}
+
 const closeSelectionModal = () => {
   showSelectionModal.value = false
   searchResults.value = []
 }
+
 const toggleEditMode = () => {
   isEditing.value = !isEditing.value
   if (!isEditing.value) {
     editedManga.value = { ...manga.value }
   }
 }
+
 const changeStatus = (newStatus: Manga['status']) => {
   if (editedManga.value) {
     editedManga.value.status = newStatus
     salvarEdicao()
   }
 }
+
 const incrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -360,6 +325,7 @@ const incrementarCapitulo = () => {
     }
   }
 }
+
 const decrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -370,6 +336,7 @@ const decrementarCapitulo = () => {
     salvarEdicao()
   }
 }
+
 const statusClass = computed(() => {
   if (!manga.value) return ''
   switch (manga.value.status) {
@@ -385,10 +352,37 @@ const statusClass = computed(() => {
       return ''
   }
 })
+
+onMounted(() => {
+  carregarManga()
+})
+
+watch(
+  () => route.params.id,
+  () => {
+    carregarManga()
+  },
+)
 </script>
 
 <style scoped>
-/* O CSS não precisa de alterações */
+/* Adicionando grid e labels para o formulário de edição */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+div[v-else] label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--subtle-text-color);
+}
+div[v-else] > label {
+  margin-top: 15px;
+}
+/* Estilos existentes */
 #update-btn {
   background-color: var(--primary-color);
   color: white;
@@ -613,20 +607,5 @@ select {
 .modal-textarea {
   resize: vertical;
   min-height: 120px;
-}
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-div[v-else] label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--subtle-text-color);
-}
-div[v-else] > label {
-  margin-top: 15px;
 }
 </style>
