@@ -61,102 +61,65 @@
             </div>
           </div>
         </div>
-
         <div v-else>
           <h1>Editar Mangá</h1>
-          <label>Título</label>
           <input
             type="text"
             v-model="editedManga.titulo"
             class="modal-input"
             placeholder="Título"
           />
-
-          <label>URL da Imagem de Capa</label>
-          <input
-            type="url"
-            v-model="editedManga.capaUrl"
-            class="modal-input"
-            placeholder="https://exemplo.com/imagem.jpg"
-          />
-
-          <label>Link para Leitura</label>
           <input
             type="url"
             v-model="editedManga.linkLeitura"
             class="modal-input"
             placeholder="https://exemplo.com/manga/.."
           />
-
-          <label>Gêneros (separados por vírgula)</label>
           <input
             type="text"
             v-model="editedManga.generos"
             class="modal-input"
-            placeholder="Ação, Aventura, Fantasia..."
+            placeholder="Gêneros (separados por vírgula)"
           />
-
-          <div class="form-grid">
-            <div>
-              <label>Total de Capítulos</label>
-              <input
-                type="number"
-                v-model.number="editedManga.capitulos"
-                class="modal-input"
-                placeholder="Total de Capítulos"
-              />
-            </div>
-            <div>
-              <label>Capítulos Lidos</label>
-              <input
-                type="number"
-                v-model.number="editedManga.capitulosLidos"
-                class="modal-input"
-                placeholder="Capítulos Lidos"
-              />
-            </div>
-          </div>
-
-          <label>Nomes Alternativos</label>
+          <input
+            type="number"
+            v-model.number="editedManga.capitulos"
+            class="modal-input"
+            placeholder="Total de Capítulos"
+          />
+          <input
+            type="number"
+            v-model.number="editedManga.capitulosLidos"
+            class="modal-input"
+            placeholder="Capítulos Lidos"
+          />
           <input
             type="text"
             v-model="editedManga.nomesAlternativos"
             class="modal-input"
             placeholder="Nomes Alternativos"
           />
-
-          <div class="form-grid">
-            <div>
-              <label>Tipo</label>
-              <select v-model="editedManga.tipo" class="modal-input">
-                <option>Manga</option>
-                <option>Manhwa</option>
-                <option>Manhua</option>
-                <option>Novel</option>
-                <option>Light Novel</option>
-                <option>One-shot</option>
-                <option>Doujinshi</option>
-              </select>
-            </div>
-            <div>
-              <label>Status</label>
-              <select v-model="editedManga.status" class="modal-input">
-                <option>Quero Ler</option>
-                <option>Lendo</option>
-                <option>Lido</option>
-                <option>Abandonado</option>
-              </select>
-            </div>
-          </div>
-
-          <label>Descrição</label>
+          <select v-model="editedManga.tipo" class="modal-input">
+            <option>Manga</option>
+            <option>Manhwa</option>
+            <option>Manhua</option>
+            <option>Novel</option>
+            <option>Light Novel</option>
+            <option>One-shot</option>
+            <option>Doujinshi</option>
+          </select>
+          <select v-model="editedManga.status" class="modal-input">
+            <option>Quero Ler</option>
+            <option>Lendo</option>
+            <option>Lido</option>
+            <option>Abandonado</option>
+          </select>
           <textarea
             v-model="editedManga.descricao"
             class="modal-textarea"
             placeholder="Descrição"
           ></textarea>
         </div>
-
         <div class="modal-actions">
           <template v-if="!isEditing">
             <button id="update-btn" @click="openUpdateConfirmation" :disabled="isUpdating">
@@ -175,11 +138,9 @@
         <p>{{ manga.descricao }}</p>
       </div>
     </div>
-
     <div v-else class="not-found">
       <h1>Mangá não encontrado</h1>
     </div>
-
     <ConfirmationModal
       v-if="showConfirmationModal"
       :title="confirmationTitle"
@@ -187,13 +148,6 @@
       confirm-text="Atualizar"
       @confirm="handleConfirmUpdate"
       @cancel="showConfirmationModal = false"
-    />
-    <MangaSelectionModal
-      v-if="showSelectionModal"
-      :results="searchResults"
-      action-text="Selecionar"
-      @close="closeSelectionModal"
-      @mangaSelected="handleMangaSelectedForUpdate"
     />
   </div>
 </template>
@@ -205,7 +159,6 @@ import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
 import type { Manga } from '@/types'
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
-import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
 
 const manga = ref<Manga | null>(null)
 const editedManga = ref<Partial<Manga>>({})
@@ -214,8 +167,6 @@ const isUpdating = ref(false)
 const showConfirmationModal = ref(false)
 const confirmationTitle = ref('')
 const confirmationMessage = ref('')
-const showSelectionModal = ref(false)
-const searchResults = ref<Manga[]>([])
 
 const route = useRoute()
 const toast = useToast()
@@ -240,6 +191,7 @@ const handleConfirmUpdate = async () => {
   toast.info(`Buscando por atualizações para "${manga.value.titulo}"...`)
 
   const { data: resultados, error } = await fetchMangaData(manga.value.titulo)
+
   isUpdating.value = false
 
   if (error) {
@@ -248,36 +200,21 @@ const handleConfirmUpdate = async () => {
   }
 
   if (resultados && resultados.length > 0) {
-    if (resultados.length > 1) {
-      searchResults.value = resultados
-      showSelectionModal.value = true
-    } else {
-      handleMangaSelectedForUpdate(resultados[0])
+    // Para simplificar, vamos pegar o primeiro resultado para a atualização
+    const dadosAtualizados = resultados[0]
+    const mangaParaSalvar: Manga = {
+      ...dadosAtualizados,
+      status: manga.value.status,
+      capitulosLidos: manga.value.capitulosLidos,
+      linkLeitura: manga.value.linkLeitura,
+      isManual: false,
     }
+    editedManga.value = mangaParaSalvar
+    salvarEdicao(false)
+    toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
   } else {
     toast.warning('Nenhuma atualização encontrada para este título.')
   }
-}
-
-const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
-  if (!manga.value) return
-  const mangaParaSalvar: Manga = {
-    ...selectedManga,
-    status: manga.value.status,
-    capitulosLidos: manga.value.capitulosLidos,
-    linkLeitura: manga.value.linkLeitura,
-    isManual: false,
-  }
-
-  editedManga.value = mangaParaSalvar
-  salvarEdicao(false)
-  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
-  closeSelectionModal()
-}
-
-const closeSelectionModal = () => {
-  showSelectionModal.value = false
-  searchResults.value = []
 }
 
 const carregarManga = () => {
@@ -304,9 +241,7 @@ const toggleEditMode = () => {
 
 const salvarEdicao = (showToast = false) => {
   const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]')
-  // IMPORTANTE: usamos o título original (antes da edição) para encontrar o item
   const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
-
   if (index !== -1 && manga.value) {
     mangasSalvos[index] = editedManga.value as Manga
     localStorage.setItem('mangasLidos', JSON.stringify(mangasSalvos))
@@ -381,24 +316,6 @@ watch(
 </script>
 
 <style scoped>
-/* Adicionando grid e labels para o formulário de edição */
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-div[v-else] label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--subtle-text-color);
-}
-div[v-else] > label {
-  margin-top: 15px;
-}
-
-/* Estilos existentes */
 #update-btn {
   background-color: var(--primary-color);
   color: white;
