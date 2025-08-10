@@ -70,7 +70,6 @@
             class="modal-input"
             placeholder="Título"
           />
-
           <label>URL da Imagem de Capa</label>
           <input
             type="url"
@@ -78,7 +77,6 @@
             class="modal-input"
             placeholder="https://exemplo.com/imagem.jpg"
           />
-
           <label>Link para Leitura</label>
           <input
             type="url"
@@ -86,7 +84,6 @@
             class="modal-input"
             placeholder="https://exemplo.com/manga/.."
           />
-
           <label>Gêneros (separados por vírgula)</label>
           <input
             type="text"
@@ -94,7 +91,6 @@
             class="modal-input"
             placeholder="Ação, Aventura, Fantasia..."
           />
-
           <div class="form-grid">
             <div>
               <label>Total de Capítulos</label>
@@ -115,7 +111,6 @@
               />
             </div>
           </div>
-
           <label>Nomes Alternativos</label>
           <input
             type="text"
@@ -123,7 +118,6 @@
             class="modal-input"
             placeholder="Nomes Alternativos"
           />
-
           <div class="form-grid">
             <div>
               <label>Tipo</label>
@@ -147,7 +141,6 @@
               </select>
             </div>
           </div>
-
           <label>Descrição</label>
           <textarea
             v-model="editedManga.descricao"
@@ -155,7 +148,6 @@
             placeholder="Descrição"
           ></textarea>
         </div>
-
         <div class="modal-actions">
           <template v-if="!isEditing">
             <button id="update-btn" @click="openUpdateConfirmation" :disabled="isUpdating">
@@ -174,7 +166,6 @@
         <p>{{ manga.descricao }}</p>
       </div>
     </div>
-
     <div v-else class="not-found">
       <h1>Mangá não encontrado</h1>
     </div>
@@ -202,6 +193,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
+import { getListaDeMangas, salvarListaDeMangas } from '@/firebase/firestoreService' // <-- IMPORTAMOS AS FUNÇÕES DO FIRESTORE
 import type { Manga } from '@/types'
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
@@ -219,64 +211,9 @@ const searchResults = ref<Manga[]>([])
 const route = useRoute()
 const toast = useToast()
 
-const openUpdateConfirmation = () => {
-  if (!manga.value) return
-  confirmationTitle.value = 'Confirmar Atualização'
-  if (manga.value.isManual) {
-    confirmationMessage.value = `Este item foi adicionado <strong>manualmente</strong>. Atualizar com dados da internet pode sobrescrever suas informações com as de outro mangá com nome parecido.<br><br>Deseja continuar?`
-  } else {
-    confirmationMessage.value =
-      'Isso buscará as informações mais recentes nas APIs e atualizará os dados deste item. Seus dados pessoais (status, capítulos lidos) serão mantidos.<br><br>Deseja continuar?'
-  }
-  showConfirmationModal.value = true
-}
-
-const handleConfirmUpdate = async () => {
-  showConfirmationModal.value = false
-  if (!manga.value) return
-
-  isUpdating.value = true
-  toast.info(`Buscando por atualizações para "${manga.value.titulo}"...`)
-
-  const { data: resultados, error } = await fetchMangaData(manga.value.titulo)
-  isUpdating.value = false
-
-  if (error) {
-    toast.error('Falha ao buscar atualizações.')
-    return
-  }
-
-  if (resultados && resultados.length > 0) {
-    searchResults.value = resultados
-    showSelectionModal.value = true
-  } else {
-    toast.warning('Nenhuma atualização encontrada para este título.')
-  }
-}
-
-const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
-  if (!manga.value) return
-  const mangaParaSalvar: Manga = {
-    ...selectedManga,
-    status: manga.value.status,
-    capitulosLidos: manga.value.capitulosLidos,
-    linkLeitura: manga.value.linkLeitura,
-    isManual: false,
-  }
-
-  editedManga.value = mangaParaSalvar
-  salvarEdicao(false)
-  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
-  closeSelectionModal()
-}
-
-const closeSelectionModal = () => {
-  showSelectionModal.value = false
-  searchResults.value = []
-}
-
-const carregarManga = () => {
-  const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]')
+const carregarManga = async () => {
+  // LÓGICA DE CARREGAMENTO ATUALIZADA
+  const mangasSalvos = await getListaDeMangas() // <-- BUSCA DO FIRESTORE
   const mangaSlug = route.params.id as string
   const encontrado = mangasSalvos.find((m) => {
     if (!m || !m.titulo) return false
@@ -290,36 +227,126 @@ const carregarManga = () => {
   editedManga.value = { ...encontrado }
 }
 
-const toggleEditMode = () => {
-  isEditing.value = !isEditing.value
-  if (!isEditing.value) {
-    editedManga.value = { ...manga.value }
-  }
-}
-
-const salvarEdicao = (showToast = false) => {
-  const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]')
+const salvarEdicao = async (showToast = false) => {
+  // LÓGICA DE SALVAMENTO ATUALIZADA
+  const mangasSalvos = await getListaDeMangas() // <-- BUSCA DO FIRESTORE
   const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
+
   if (index !== -1 && manga.value) {
     mangasSalvos[index] = editedManga.value as Manga
-    localStorage.setItem('mangasLidos', JSON.stringify(mangasSalvos))
-    manga.value = { ...editedManga.value } as Manga
-    if (showToast) {
-      isEditing.value = false
-      toast.success('Mangá atualizado com sucesso!')
+
+    try {
+      await salvarListaDeMangas(mangasSalvos) // <-- SALVA NO FIRESTORE
+      manga.value = { ...editedManga.value } as Manga
+      if (showToast) {
+        isEditing.value = false
+        toast.success('Mangá atualizado com sucesso!')
+      }
+    } catch (error) {
+      toast.error('Erro ao salvar alterações.')
+      console.error(error)
     }
   } else {
     toast.error('Erro ao encontrar o mangá para salvar.')
   }
 }
 
+const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
+  if (!manga.value) return
+  const mangaParaSalvar: Manga = {
+    ...selectedManga,
+    status: manga.value.status,
+    capitulosLidos: manga.value.capitulosLidos,
+    linkLeitura: manga.value.linkLeitura,
+    isManual: false,
+  }
+  editedManga.value = mangaParaSalvar
+  salvarEdicao(false)
+  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
+  closeSelectionModal()
+}
+
+// As outras funções que chamam 'salvarEdicao' agora funcionarão com Firestore automaticamente
+const openUpdateConfirmation = () => {
+  /* ...código existente... */
+}
+const handleConfirmUpdate = async () => {
+  /* ...código existente... */
+}
+const closeSelectionModal = () => {
+  /* ...código existente... */
+}
+const toggleEditMode = () => {
+  /* ...código existente... */
+}
+const changeStatus = (newStatus: Manga['status']) => {
+  /* ...código existente... */
+}
+const incrementarCapitulo = () => {
+  /* ...código existente... */
+}
+const decrementarCapitulo = () => {
+  /* ...código existente... */
+}
+const statusClass = computed(() => {
+  /* ...código existente... */
+})
+onMounted(() => {
+  carregarManga()
+})
+watch(
+  () => route.params.id,
+  () => {
+    carregarManga()
+  },
+)
+
+// Colando o resto das funções para garantir
+const openUpdateConfirmation = () => {
+  if (!manga.value) return
+  confirmationTitle.value = 'Confirmar Atualização'
+  if (manga.value.isManual) {
+    confirmationMessage.value = `Este item foi adicionado <strong>manualmente</strong>. Atualizar com dados da internet pode sobrescrever suas informações com as de outro mangá com nome parecido.<br><br>Deseja continuar?`
+  } else {
+    confirmationMessage.value =
+      'Isso buscará as informações mais recentes nas APIs e atualizará os dados deste item. Seus dados pessoais (status, capítulos lidos) serão mantidos.<br><br>Deseja continuar?'
+  }
+  showConfirmationModal.value = true
+}
+const handleConfirmUpdate = async () => {
+  showConfirmationModal.value = false
+  if (!manga.value) return
+  isUpdating.value = true
+  toast.info(`Buscando por atualizações para "${manga.value.titulo}"...`)
+  const { data: resultados, error } = await fetchMangaData(manga.value.titulo)
+  isUpdating.value = false
+  if (error) {
+    toast.error('Falha ao buscar atualizações.')
+    return
+  }
+  if (resultados && resultados.length > 0) {
+    searchResults.value = resultados
+    showSelectionModal.value = true
+  } else {
+    toast.warning('Nenhuma atualização encontrada para este título.')
+  }
+}
+const closeSelectionModal = () => {
+  showSelectionModal.value = false
+  searchResults.value = []
+}
+const toggleEditMode = () => {
+  isEditing.value = !isEditing.value
+  if (!isEditing.value) {
+    editedManga.value = { ...manga.value }
+  }
+}
 const changeStatus = (newStatus: Manga['status']) => {
   if (editedManga.value) {
     editedManga.value.status = newStatus
     salvarEdicao()
   }
 }
-
 const incrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -333,7 +360,6 @@ const incrementarCapitulo = () => {
     }
   }
 }
-
 const decrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -344,7 +370,6 @@ const decrementarCapitulo = () => {
     salvarEdicao()
   }
 }
-
 const statusClass = computed(() => {
   if (!manga.value) return ''
   switch (manga.value.status) {
@@ -360,20 +385,10 @@ const statusClass = computed(() => {
       return ''
   }
 })
-
-onMounted(() => {
-  carregarManga()
-})
-
-watch(
-  () => route.params.id,
-  () => {
-    carregarManga()
-  },
-)
 </script>
 
 <style scoped>
+/* O CSS não precisa de alterações */
 #update-btn {
   background-color: var(--primary-color);
   color: white;

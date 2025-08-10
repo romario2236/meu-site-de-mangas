@@ -1,5 +1,5 @@
 // src/firebase/firestoreService.ts
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore"; // Importa o onSnapshot
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { app } from "./config";
 import type { Manga } from "@/types";
@@ -15,10 +15,26 @@ export const salvarListaDeMangas = (lista: Manga[]) => {
   const usuario = auth.currentUser;
   if (usuario) {
     const docRef = doc(db, 'usuarios', usuario.uid);
-    // Usamos { merge: true } para não apagar outros campos do documento no futuro
     return setDoc(docRef, { mangas: lista }, { merge: true });
   }
   return Promise.reject(new Error("Usuário não está logado para salvar a lista."));
+};
+
+/**
+ * Carrega a lista de mangás do usuário UMA ÚNICA VEZ.
+ * @returns Uma promessa que resolve para a lista de mangás do usuário.
+ */
+export const getListaDeMangas = async (): Promise<Manga[]> => {
+    const usuario = auth.currentUser;
+    if(usuario) {
+        const docRef = doc(db, 'usuarios', usuario.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().mangas) {
+            return docSnap.data().mangas as Manga[];
+        }
+        return [];
+    }
+    return [];
 };
 
 /**
@@ -30,18 +46,14 @@ export const escutarListaDeMangas = (callback: (lista: Manga[]) => void) => {
   const usuario = auth.currentUser;
   if (usuario) {
     const docRef = doc(db, 'usuarios', usuario.uid);
-    // onSnapshot cria o listener em tempo real
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().mangas) {
-        // Se o documento existe, chama o callback com a lista
         callback(docSnap.data().mangas as Manga[]);
       } else {
-        // Se o usuário não tem lista, chama o callback com uma lista vazia
         callback([]);
       }
     });
-    return unsubscribe; // Retorna a função de cancelamento
+    return unsubscribe;
   }
-  // Se não há usuário, retorna uma função vazia
   return () => {};
 };
