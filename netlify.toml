@@ -1,3 +1,5 @@
+# Arquivo: netlify.toml
+
 [[redirects]]
   from = "/api/jikan/*"
   to = "https://api.jikan.moe/v4/:splat"
@@ -13,7 +15,7 @@
   to = "https://api.mangadex.org/:splat"
   status = 200
 
-# Regra para o Vue Router
+# Regra de segurança para o Vue Router
 [[redirects]]
   from = "/*"
   to = "/index.html"

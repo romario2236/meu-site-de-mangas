@@ -4,10 +4,10 @@
 import type { Manga } from '@/types';
 
 export async function fetchMangaData(nomeManga: string) {
+  // Garanta que os caminhos começam com /api/
   const jikanUrl = `/api/jikan/manga?q=${encodeURIComponent(nomeManga)}&limit=5`;
   const kitsuUrl = `/api/kitsu/manga?filter[text]=${encodeURIComponent(nomeManga)}&page[limit]=5`;
   const mangadexUrl = `/api/mangadex/manga?title=${encodeURIComponent(nomeManga)}&limit=5&includes[]=cover_art`;
-
   try {
     console.log("Iniciando busca em todas as 3 fontes...");
     const responses = await Promise.allSettled([
