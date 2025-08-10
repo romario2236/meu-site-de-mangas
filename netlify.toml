@@ -1,0 +1,14 @@
+[[redirects]]
+  from = "/api/jikan/*"
+  to = "https://api.jikan.moe/v4/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/kitsu/*"
+  to = "https://kitsu.io/api/edge/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/mangadex/*"
+  to = "https://api.mangadex.org/:splat"
+  status = 200
