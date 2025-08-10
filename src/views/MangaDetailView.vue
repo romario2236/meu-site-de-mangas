@@ -212,30 +212,18 @@ const route = useRoute()
 const toast = useToast()
 
 const carregarManga = async () => {
-  console.log('--- DEBUG: INICIANDO CARREGAMENTO NA PÁGINA DE DETALHES ---')
-
   const mangasSalvos = await getListaDeMangas()
-  console.log('1. Mangás carregados do Firestore:', mangasSalvos)
-
-  const mangaSlugDaUrl = route.params.id as string
-  console.log('2. Slug da URL:', mangaSlugDaUrl)
-
+  const mangaSlug = route.params.id as string
   const encontrado = mangasSalvos.find((m) => {
     if (!m || !m.titulo) return false
-    const slugGerado = m.titulo
+    const slug = m.titulo
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
-    console.log(
-      `--> Comparando: URL ('${mangaSlugDaUrl}') com Slug Gerado ('${slugGerado}') do mangá "${m.titulo}"`,
-    )
-    return slugGerado === mangaSlugDaUrl
+    return slug === mangaSlug
   })
-
-  console.log('3. Resultado da busca:', encontrado)
   manga.value = encontrado || null
   editedManga.value = { ...encontrado }
-  console.log('--- FIM DO DEBUG ---')
 }
 
 const salvarEdicao = async (showToast = false) => {

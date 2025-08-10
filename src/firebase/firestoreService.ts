@@ -7,10 +7,6 @@ import type { Manga } from "@/types";
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-/**
- * Salva a lista completa de mangás para o usuário atualmente logado.
- * @param lista A lista de mangás a ser salva.
- */
 export const salvarListaDeMangas = (lista: Manga[]) => {
   const usuario = auth.currentUser;
   if (usuario) {
@@ -20,10 +16,6 @@ export const salvarListaDeMangas = (lista: Manga[]) => {
   return Promise.reject(new Error("Usuário não está logado para salvar a lista."));
 };
 
-/**
- * Carrega a lista de mangás do usuário UMA ÚNICA VEZ.
- * @returns Uma promessa que resolve para a lista de mangás do usuário.
- */
 export const getListaDeMangas = async (): Promise<Manga[]> => {
     const usuario = auth.currentUser;
     if(usuario) {
@@ -37,11 +29,6 @@ export const getListaDeMangas = async (): Promise<Manga[]> => {
     return [];
 };
 
-/**
- * Inicia um listener em tempo real para a lista de mangás do usuário.
- * @param callback A função que será chamada com a nova lista sempre que ela mudar.
- * @returns Uma função para parar de escutar (unsubscribe).
- */
 export const escutarListaDeMangas = (callback: (lista: Manga[]) => void) => {
   const usuario = auth.currentUser;
   if (usuario) {
