@@ -1,7 +1,10 @@
 <template>
   <div class="home-wrapper">
     <div class="header-section">
-      <h1>Gerenciador de Mangás</h1>
+      <div class="header-top">
+        <h1>Gerenciador de Mangás</h1>
+        <button @click="handleLogout" class="btn-logout">Sair</button>
+      </div>
       <div class="add-manga-container">
         <input
           type="text"
@@ -182,7 +185,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { fazerLogout } from '@/firebase/authService'
+import { escutarListaDeMangas, salvarListaDeMangas } from '@/firebase/firestoreService'
 import MangaCard from '@/components/MangaCard.vue'
 import CardSkeleton from '@/components/CardSkeleton.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
@@ -205,39 +211,31 @@ const sortBy = ref('titulo-asc')
 const isLoading = ref(false)
 const filtroNome = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const router = useRouter()
 
-const adicionarMangaManual = (novoManga: Manga) => {
-  adicionarMangaSelecionado(novoManga)
-  showManualAddModal.value = false
-}
+let pararDeEscutar: () => void
 
-const salvarMangas = () => {
-  localStorage.setItem('mangasLidos', JSON.stringify(mangasLidos.value))
-  salvarGeneros()
-}
-
-const carregarMangas = () => {
-  const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]')
-  if (mangasSalvos) {
-    mangasLidos.value = mangasSalvos
+onMounted(() => {
+  pararDeEscutar = escutarListaDeMangas((novaLista) => {
+    mangasLidos.value = novaLista
     todosOsGeneros.value.clear()
-    mangasSalvos.forEach((manga) => {
+    novaLista.forEach((manga) => {
       if (manga.generos && manga.generos !== 'N/A') {
         manga.generos.split(', ').forEach((g: string) => todosOsGeneros.value.add(g.trim()))
       }
     })
-  }
-}
+  })
+})
 
-const salvarGeneros = () => {
-  localStorage.setItem('todosOsGeneros', JSON.stringify(Array.from(todosOsGeneros.value)))
-}
-
-const carregarGeneros = () => {
-  const generosSalvos = JSON.parse(localStorage.getItem('todosOsGeneros') || '[]')
-  if (generosSalvos) {
-    todosOsGeneros.value = new Set(generosSalvos)
+onUnmounted(() => {
+  if (pararDeEscutar) {
+    pararDeEscutar()
   }
+})
+
+const handleLogout = async () => {
+  await fazerLogout()
+  router.push('/login')
 }
 
 const buscarManga = async () => {
@@ -264,15 +262,35 @@ const adicionarMangaSelecionado = (manga: Manga) => {
   if (mangasLidos.value.some((item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase())) {
     toast.info(`"${manga.titulo}" já está na sua lista.`)
   } else {
-    mangasLidos.value.push(manga)
-    if (manga.generos && manga.generos !== 'N/A') {
-      manga.generos.split(', ').forEach((genero: string) => todosOsGeneros.value.add(genero.trim()))
-    }
-    salvarMangas()
-    toast.success(`"${manga.titulo}" foi adicionado à lista!`)
+    const novaLista = [...mangasLidos.value, manga]
+    salvarListaDeMangas(novaLista)
+      .then(() => {
+        toast.success(`"${manga.titulo}" foi adicionado à lista!`)
+      })
+      .catch((err) => {
+        toast.error('Erro ao salvar o mangá.')
+        console.error(err)
+      })
   }
   mangaInput.value = ''
   closeSelectionModal()
+}
+
+const adicionarMangaManual = (novoManga: Manga) => {
+  adicionarMangaSelecionado(novoManga)
+  showManualAddModal.value = false
+}
+
+const removerManga = (mangaParaRemover: Manga) => {
+  const novaLista = mangasLidos.value.filter((manga) => manga.titulo !== mangaParaRemover.titulo)
+  salvarListaDeMangas(novaLista)
+    .then(() => {
+      toast.info(`"${mangaParaRemover.titulo}" foi removido da lista.`)
+    })
+    .catch((err) => {
+      toast.error('Erro ao remover o mangá.')
+      console.error(err)
+    })
 }
 
 const closeSelectionModal = () => {
@@ -304,7 +322,6 @@ const importarLista = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
-
   const reader = new FileReader()
   reader.onload = (e) => {
     try {
@@ -314,12 +331,15 @@ const importarLista = (event: Event) => {
       if (!Array.isArray(novaLista) || (novaLista.length > 0 && !novaLista[0].titulo)) {
         throw new Error('Formato do arquivo JSON inválido.')
       }
-      mangasLidos.value = novaLista
-      salvarMangas()
-      carregarMangas()
-      toast.success('Lista importada e substituída com sucesso!')
+      salvarListaDeMangas(novaLista)
+        .then(() => {
+          toast.success('Lista importada com sucesso!')
+        })
+        .catch((err) => {
+          toast.error('Erro ao salvar a lista importada.')
+          console.error(err)
+        })
     } catch (error) {
-      console.error('Erro ao importar arquivo:', error)
       toast.error('Falha ao importar. Verifique se o arquivo é um JSON válido.')
     } finally {
       if (target) target.value = ''
@@ -361,12 +381,6 @@ const mangasFiltradosEOrdenados = computed(() => {
 
 const todosOsGenerosOrdenados = computed(() => Array.from(todosOsGeneros.value).sort())
 
-const removerManga = (mangaParaRemover: Manga) => {
-  mangasLidos.value = mangasLidos.value.filter((manga) => manga !== mangaParaRemover)
-  salvarMangas()
-  toast.info(`"${mangaParaRemover.titulo}" foi removido da lista.`)
-}
-
 const toggleGenero = (genero: string) => {
   const index = generoSelecionado.value.indexOf(genero)
   if (index > -1) {
@@ -387,13 +401,26 @@ const setStatus = (status: string) => {
 const setTipo = (tipo: string) => {
   tipoSelecionado.value = tipo
 }
-
-onMounted(() => {
-  carregarMangas()
-})
 </script>
 
 <style scoped>
+.header-top {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  padding: 0 50px;
+}
+.header-top h1 {
+  margin: 0;
+}
+.btn-logout {
+  position: absolute;
+  right: 0;
+  background-color: var(--remove-color);
+  padding: 8px 16px;
+  font-size: 14px;
+}
 #search-local {
   width: 100%;
   padding: 10px;
@@ -417,6 +444,7 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
   gap: 10px;
+  margin-top: 20px;
 }
 #manual-add-button {
   background-color: var(--card-bg-color);
