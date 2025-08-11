@@ -35,10 +35,30 @@
             </select>
           </div>
         </div>
+
         <div class="form-group">
-          <label for="generos">Gêneros</label>
-          <input type="text" id="generos" v-model="novoManga.generos" placeholder="Ação, Aventura, Fantasia...">
+          <label for="generos">Gêneros (clique para selecionar)</label>
+          <div class="genre-selector">
+            <span
+              v-for="genre in existingGenres"
+              :key="genre"
+              class="genre-tag"
+              :class="{ selected: selectedGenres.includes(genre) }"
+              @click="toggleGenre(genre)"
+            >
+              {{ genre }}
+            </span>
+          </div>
+          <input
+            type="text"
+            id="generos"
+            v-model="newGenreInput"
+            @keydown.enter.prevent="addNewGenre"
+            placeholder="Ou adicione um novo gênero e tecle Enter"
+            class="new-genre-input"
+          >
         </div>
+
         <div class="form-group">
           <label for="linkLeitura">Link para Leitura</label>
           <input type="url" id="linkLeitura" v-model="novoManga.linkLeitura" placeholder="https://...">
@@ -58,35 +78,62 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import type { Manga } from '@/types';
+
+const props = defineProps<{
+  existingGenres: string[]
+}>();
 
 const emit = defineEmits(['close', 'save']);
 
-// Objeto reativo para guardar os dados do formulário, agora incluindo gêneros
-const novoManga = ref<Omit<Manga, 'capitulos' | 'capitulosLidos' | 'nomesAlternativos'>>({
+const novoManga = ref<Omit<Manga, 'capitulos' | 'capitulosLidos' | 'nomesAlternativos' | 'isManual' | 'generos'>>({
   titulo: '',
   capaUrl: '',
   descricao: '',
   status: 'Quero Ler',
   linkLeitura: '',
   tipo: 'Manga',
-  generos: '', // <-- CAMPO ADICIONADO
 });
 
-// Dentro de <script setup> em src/components/ManualAddModal.vue
+const selectedGenres = ref<string[]>([]);
+const newGenreInput = ref('');
+
+const toggleGenre = (genre: string) => {
+  const index = selectedGenres.value.indexOf(genre);
+  if (index > -1) {
+    selectedGenres.value.splice(index, 1);
+  } else {
+    selectedGenres.value.push(genre);
+  }
+};
+
+const addNewGenre = () => {
+  const newGenre = newGenreInput.value.trim();
+  if (newGenre && !selectedGenres.value.includes(newGenre)) {
+    selectedGenres.value.push(newGenre);
+  }
+  newGenreInput.value = ''; // Limpa o input
+};
+
 const handleSubmit = () => {
-  const generosTratado = novoManga.value.generos.trim() === '' ? 'N/A' : novoManga.value.generos;
+  const generosTratado = selectedGenres.value.length > 0 ? selectedGenres.value.join(', ') : 'N/A';
+
   const mangaCompleto: Manga = {
     ...novoManga.value,
     generos: generosTratado,
     capitulos: 'N/A',
     capitulosLidos: 0,
     nomesAlternativos: 'N/A',
-    isManual: true, // <-- CAMPO ADICIONADO
+    isManual: true,
   };
   emit('save', mangaCompleto);
 };
+
+// Limpa os gêneros selecionados quando o modal é fechado/reaberto
+watch(() => props.existingGenres, () => {
+    selectedGenres.value = [];
+});
 </script>
 
 <style scoped>
@@ -141,5 +188,34 @@ textarea {
 }
 .cancel-btn {
     background-color: var(--remove-color);
+}
+
+/* ESTILOS PARA O SELETOR DE GÊNEROS */
+.genre-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    background-color: var(--bg-color);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 10px;
+}
+.genre-tag {
+    background-color: var(--border-color);
+    color: var(--subtle-text-color);
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+.genre-tag.selected {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
+}
+.new-genre-input {
+    margin-top: 10px;
 }
 </style>

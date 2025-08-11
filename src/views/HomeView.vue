@@ -177,9 +177,11 @@
       @mangaSelected="adicionarMangaSelecionado"
     />
     <ManualAddModal
-      v-if="showManualAddModal"
-      @close="showManualAddModal = false"
-      @save="adicionarMangaManual"
+  v-if="showManualAddModal"
+  :existing-genres="todosOsGenerosOrdenados"
+  @close="showManualAddModal = false"
+  @save="adicionarMangaManual"
+/>
     />
   </div>
 </template>
