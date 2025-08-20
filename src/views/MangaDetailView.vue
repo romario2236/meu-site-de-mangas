@@ -238,7 +238,7 @@ const carregarManga = async () => {
     return slug === mangaSlug
   })
   manga.value = encontrado || null
-  editedManga.value = JSON.parse(JSON.stringify(encontrado || {})) // Cópia profunda para edição
+  editedManga.value = JSON.parse(JSON.stringify(encontrado || {}))
 }
 
 const salvarEdicao = async (showToast = false) => {
@@ -277,17 +277,15 @@ const closeSelectionModal = () => {
 const toggleEditMode = () => {
   isEditing.value = !isEditing.value
   if (!isEditing.value) {
-    editedManga.value = JSON.parse(JSON.stringify(manga.value || {})) // Reseta ao cancelar
+    editedManga.value = JSON.parse(JSON.stringify(manga.value || {}))
   }
 }
-
 const changeStatus = (newStatus: Manga['status']) => {
   if (editedManga.value) {
     editedManga.value.status = newStatus
     salvarEdicao()
   }
 }
-
 const incrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -301,7 +299,6 @@ const incrementarCapitulo = () => {
     }
   }
 }
-
 const decrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -312,21 +309,17 @@ const decrementarCapitulo = () => {
     salvarEdicao()
   }
 }
-
-// <-- NOVAS FUNÇÕES PARA GERENCIAR A LISTA DE LINKS -->
 const addLink = () => {
   if (!editedManga.value.linksLeitura) {
     editedManga.value.linksLeitura = []
   }
   editedManga.value.linksLeitura.push('')
 }
-
 const removeLink = (index: number) => {
   if (editedManga.value.linksLeitura) {
     editedManga.value.linksLeitura.splice(index, 1)
   }
 }
-
 const statusClass = computed(() => {
   /* ...código existente... */
 })
@@ -376,7 +369,7 @@ const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
     ...selectedManga,
     status: manga.value.status,
     capitulosLidos: manga.value.capitulosLidos,
-    linksLeitura: manga.value.linksLeitura, // Mantém os links antigos
+    linksLeitura: manga.value.linksLeitura,
     isManual: false,
   }
   editedManga.value = mangaParaSalvar
@@ -411,6 +404,7 @@ const statusClass = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  width: 100%;
 }
 .link-input-group {
   display: flex;
