@@ -96,7 +96,9 @@
 import { ref, watch } from 'vue'
 import type { Manga } from '@/types'
 
-const props = defineProps<{ existingGenres: string[] }>()
+const props = defineProps<{
+  existingGenres: string[]
+}>()
 const emit = defineEmits(['close', 'save'])
 
 const novoManga = ref<

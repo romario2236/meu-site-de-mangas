@@ -8,7 +8,7 @@ export interface Manga {
   nomesAlternativos: string;
   status: 'Quero Ler' | 'Lendo' | 'Lido' | 'Abandonado';
   capitulosLidos: number;
-  linksLeitura: string[]; // <-- MUDANÇA: De string para uma lista de strings
+  linksLeitura: string[]; // <-- MUDANÇA: De 'linkLeitura: string' para uma lista
   tipo: string;
   isManual: boolean;
 }
