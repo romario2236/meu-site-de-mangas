@@ -12,10 +12,30 @@
             <div>
               <strong>Status:</strong>
               <div class="status-selector">
-                <span class="status-tag" :class="{ selected: editedManga.status === 'Quero Ler' }" @click="changeStatus('Quero Ler')">Quero Ler</span>
-                <span class="status-tag" :class="{ selected: editedManga.status === 'Lendo' }" @click="changeStatus('Lendo')">Lendo</span>
-                <span class="status-tag" :class="{ selected: editedManga.status === 'Lido' }" @click="changeStatus('Lido')">Lido</span>
-                <span class="status-tag" :class="{ selected: editedManga.status === 'Abandonado' }" @click="changeStatus('Abandonado')">Abandonado</span>
+                <span
+                  class="status-tag"
+                  :class="{ selected: editedManga.status === 'Quero Ler' }"
+                  @click="changeStatus('Quero Ler')"
+                  >Quero Ler</span
+                >
+                <span
+                  class="status-tag"
+                  :class="{ selected: editedManga.status === 'Lendo' }"
+                  @click="changeStatus('Lendo')"
+                  >Lendo</span
+                >
+                <span
+                  class="status-tag"
+                  :class="{ selected: editedManga.status === 'Lido' }"
+                  @click="changeStatus('Lido')"
+                  >Lido</span
+                >
+                <span
+                  class="status-tag"
+                  :class="{ selected: editedManga.status === 'Abandonado' }"
+                  @click="changeStatus('Abandonado')"
+                  >Abandonado</span
+                >
               </div>
             </div>
             <div><strong>Capítulos:</strong> {{ manga.capitulos }}</div>
@@ -29,41 +49,90 @@
             </div>
             <div><strong>Gêneros:</strong> {{ manga.generos }}</div>
             <div><strong>Nomes Alternativos:</strong> {{ manga.nomesAlternativos }}</div>
-            <div v-if="manga.linkLeitura">
+            <div v-if="manga.linksLeitura && manga.linksLeitura.length > 0">
               <strong>Onde Ler:</strong>
-              <a :href="manga.linkLeitura" target="_blank" rel="noopener noreferrer" class="read-link">Acessar Link</a>
+              <div class="read-links-container">
+                <a
+                  v-for="(link, index) in manga.linksLeitura"
+                  :key="index"
+                  :href="link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="read-link"
+                >
+                  Acessar Link {{ manga.linksLeitura.length > 1 ? index + 1 : '' }}
+                </a>
+              </div>
             </div>
           </div>
         </div>
-
         <div v-else>
           <h1>Editar Mangá</h1>
           <label>Título</label>
-          <input type="text" v-model="editedManga.titulo" class="modal-input" placeholder="Título" />
-
+          <input
+            type="text"
+            v-model="editedManga.titulo"
+            class="modal-input"
+            placeholder="Título"
+          />
           <label>URL da Imagem de Capa</label>
-          <input type="url" v-model="editedManga.capaUrl" class="modal-input" placeholder="https://exemplo.com/imagem.jpg" />
+          <input
+            type="url"
+            v-model="editedManga.capaUrl"
+            class="modal-input"
+            placeholder="https://exemplo.com/imagem.jpg"
+          />
 
-          <label>Link para Leitura</label>
-          <input type="url" v-model="editedManga.linkLeitura" class="modal-input" placeholder="https://exemplo.com/manga/.." />
+          <label>Links para Leitura</label>
+          <div
+            v-for="(link, index) in editedManga.linksLeitura"
+            :key="index"
+            class="link-input-group"
+          >
+            <input
+              type="url"
+              v-model="editedManga.linksLeitura[index]"
+              class="modal-input"
+              placeholder="https://..."
+            />
+            <button class="remove-link-btn" @click="removeLink(index)">×</button>
+          </div>
+          <button type="button" class="add-link-btn" @click="addLink">Adicionar outro link</button>
 
           <label>Gêneros (separados por vírgula)</label>
-          <input type="text" v-model="editedManga.generos" class="modal-input" placeholder="Ação, Aventura, Fantasia..." />
-
+          <input
+            type="text"
+            v-model="editedManga.generos"
+            class="modal-input"
+            placeholder="Ação, Aventura, Fantasia..."
+          />
           <div class="form-grid">
             <div>
               <label>Total de Capítulos</label>
-              <input type="number" v-model.number="editedManga.capitulos" class="modal-input" placeholder="Total de Capítulos" />
+              <input
+                type="number"
+                v-model.number="editedManga.capitulos"
+                class="modal-input"
+                placeholder="Total de Capítulos"
+              />
             </div>
             <div>
               <label>Capítulos Lidos</label>
-              <input type="number" v-model.number="editedManga.capitulosLidos" class="modal-input" placeholder="Capítulos Lidos" />
+              <input
+                type="number"
+                v-model.number="editedManga.capitulosLidos"
+                class="modal-input"
+                placeholder="Capítulos Lidos"
+              />
             </div>
           </div>
-
           <label>Nomes Alternativos</label>
-          <input type="text" v-model="editedManga.nomesAlternativos" class="modal-input" placeholder="Nomes Alternativos" />
-
+          <input
+            type="text"
+            v-model="editedManga.nomesAlternativos"
+            class="modal-input"
+            placeholder="Nomes Alternativos"
+          />
           <div class="form-grid">
             <div>
               <label>Tipo</label>
@@ -87,11 +156,13 @@
               </select>
             </div>
           </div>
-
           <label>Descrição</label>
-          <textarea v-model="editedManga.descricao" class="modal-textarea" placeholder="Descrição"></textarea>
+          <textarea
+            v-model="editedManga.descricao"
+            class="modal-textarea"
+            placeholder="Descrição"
+          ></textarea>
         </div>
-
         <div class="modal-actions">
           <template v-if="!isEditing">
             <button id="update-btn" @click="openUpdateConfirmation" :disabled="isUpdating">
@@ -110,203 +181,276 @@
         <p>{{ manga.descricao }}</p>
       </div>
     </div>
-
     <div v-else class="not-found">
       <h1>Mangá não encontrado</h1>
     </div>
 
-    <ConfirmationModal v-if="showConfirmationModal" :title="confirmationTitle" :message="confirmationMessage" confirm-text="Atualizar" @confirm="handleConfirmUpdate" @cancel="showConfirmationModal = false" />
-    <MangaSelectionModal v-if="showSelectionModal" :results="searchResults" action-text="Selecionar" @close="closeSelectionModal" @mangaSelected="handleMangaSelectedForUpdate" />
+    <ConfirmationModal
+      v-if="showConfirmationModal"
+      :title="confirmationTitle"
+      :message="confirmationMessage"
+      confirm-text="Atualizar"
+      @confirm="handleConfirmUpdate"
+      @cancel="showConfirmationModal = false"
+    />
+    <MangaSelectionModal
+      v-if="showSelectionModal"
+      :results="searchResults"
+      action-text="Selecionar"
+      @close="closeSelectionModal"
+      @mangaSelected="handleMangaSelectedForUpdate"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
-import { useRoute } from 'vue-router';
-import { useToast } from 'vue-toastification';
-import { fetchMangaData } from '@/composables/useMangaApi';
-import type { Manga } from '@/types';
-import ConfirmationModal from '@/components/ConfirmationModal.vue';
-import MangaSelectionModal from '@/components/MangaSelectionModal.vue';
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useToast } from 'vue-toastification'
+import { fetchMangaData } from '@/composables/useMangaApi'
+import { getListaDeMangas, salvarListaDeMangas } from '@/firebase/firestoreService'
+import type { Manga } from '@/types'
+import ConfirmationModal from '@/components/ConfirmationModal.vue'
+import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
 
-const manga = ref<Manga | null>(null);
-const editedManga = ref<Partial<Manga>>({});
-const isEditing = ref(false);
-const isUpdating = ref(false);
-const showConfirmationModal = ref(false);
-const confirmationTitle = ref('');
-const confirmationMessage = ref('');
-const showSelectionModal = ref(false);
-const searchResults = ref<Manga[]>([]);
+const manga = ref<Manga | null>(null)
+const editedManga = ref<Partial<Manga>>({})
+const isEditing = ref(false)
+const isUpdating = ref(false)
+const showConfirmationModal = ref(false)
+const confirmationTitle = ref('')
+const confirmationMessage = ref('')
+const showSelectionModal = ref(false)
+const searchResults = ref<Manga[]>([])
 
-const route = useRoute();
-const toast = useToast();
+const route = useRoute()
+const toast = useToast()
 
-const openUpdateConfirmation = () => {
-  if (!manga.value) return;
-  confirmationTitle.value = 'Confirmar Atualização';
-  if (manga.value.isManual) {
-    confirmationMessage.value = `Este item foi adicionado <strong>manualmente</strong>. Atualizar com dados da internet pode sobrescrever suas informações com as de outro mangá com nome parecido.<br><br>Deseja continuar?`;
-  } else {
-    confirmationMessage.value =
-      'Isso buscará as informações mais recentes nas APIs e atualizará os dados deste item. Seus dados pessoais (status, capítulos lidos) serão mantidos.<br><br>Deseja continuar?';
-  }
-  showConfirmationModal.value = true;
-};
-
-const handleConfirmUpdate = async () => {
-  showConfirmationModal.value = false;
-  if (!manga.value) return;
-
-  isUpdating.value = true;
-  toast.info(`Buscando por atualizações para "${manga.value.titulo}"...`);
-
-  const { data: resultados, error } = await fetchMangaData(manga.value.titulo);
-  isUpdating.value = false;
-
-  if (error) {
-    toast.error('Falha ao buscar atualizações.');
-    return;
-  }
-
-  if (resultados && resultados.length > 0) {
-    if (resultados.length > 1) {
-      searchResults.value = resultados;
-      showSelectionModal.value = true;
-    } else {
-      handleMangaSelectedForUpdate(resultados[0]);
-    }
-  } else {
-    toast.warning('Nenhuma atualização encontrada para este título.');
-  }
-};
-
-const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
-  if (!manga.value) return;
-  const mangaParaSalvar: Manga = {
-    ...selectedManga,
-    status: manga.value.status,
-    capitulosLidos: manga.value.capitulosLidos,
-    linkLeitura: manga.value.linkLeitura,
-    isManual: false,
-  };
-
-  editedManga.value = mangaParaSalvar;
-  salvarEdicao(false);
-  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`);
-  closeSelectionModal();
-};
-
-const closeSelectionModal = () => {
-  showSelectionModal.value = false;
-  searchResults.value = [];
-};
-
-const carregarManga = () => {
-  const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]');
-  const mangaSlug = route.params.id as string;
+const carregarManga = async () => {
+  const mangasSalvos = await getListaDeMangas()
+  const mangaSlug = route.params.id as string
   const encontrado = mangasSalvos.find((m) => {
-    if (!m || !m.titulo) return false;
+    if (!m || !m.titulo) return false
     const slug = m.titulo
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    return slug === mangaSlug;
-  });
-  manga.value = encontrado || null;
-  editedManga.value = { ...encontrado };
-};
+      .replace(/^-+|-+$/g, '')
+    return slug === mangaSlug
+  })
+  manga.value = encontrado || null
+  editedManga.value = JSON.parse(JSON.stringify(encontrado || {})) // Cópia profunda para edição
+}
 
-const toggleEditMode = () => {
-  isEditing.value = !isEditing.value;
-  if (!isEditing.value) {
-    editedManga.value = { ...manga.value };
+const salvarEdicao = async (showToast = false) => {
+  // Antes de salvar, se o campo de capítulos estiver vazio, define como 'N/A'
+  if (editedManga.value.capitulos === '' || editedManga.value.capitulos === null) {
+    editedManga.value.capitulos = 'N/A'
   }
-};
 
-const salvarEdicao = (showToast = false) => {
-  const mangasSalvos: Manga[] = JSON.parse(localStorage.getItem('mangasLidos') || '[]');
-  const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo);
+  const mangasSalvos = await getListaDeMangas()
+  const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
 
   if (index !== -1 && manga.value) {
-    mangasSalvos[index] = editedManga.value as Manga;
-    localStorage.setItem('mangasLidos', JSON.stringify(mangasSalvos));
-    manga.value = { ...editedManga.value } as Manga;
-    if (showToast) {
-      isEditing.value = false;
-      toast.success('Mangá atualizado com sucesso!');
+    mangasSalvos[index] = editedManga.value as Manga
+    try {
+      await salvarListaDeMangas(mangasSalvos)
+      manga.value = { ...editedManga.value } as Manga
+      if (showToast) {
+        isEditing.value = false
+        toast.success('Mangá atualizado com sucesso!')
+      }
+    } catch (error) {
+      toast.error('Erro ao salvar alterações.')
     }
   } else {
-    toast.error('Erro ao encontrar o mangá para salvar.');
+    toast.error('Erro ao encontrar o mangá para salvar.')
   }
-};
+}
+
+const openUpdateConfirmation = () => {
+  /* ...código existente... */
+}
+const handleConfirmUpdate = async () => {
+  /* ...código existente... */
+}
+const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
+  /* ...código existente... */
+}
+const closeSelectionModal = () => {
+  /* ...código existente... */
+}
+
+// <-- FUNÇÃO MODIFICADA -->
+const toggleEditMode = () => {
+  isEditing.value = !isEditing.value
+
+  // Cria uma cópia profunda para evitar problemas de reatividade
+  const mangaOriginal = JSON.parse(JSON.stringify(manga.value || {}))
+
+  // Se o valor dos capítulos for "N/A", transforma em vazio para o input numérico
+  if (mangaOriginal.capitulos === 'N/A') {
+    mangaOriginal.capitulos = ''
+  }
+
+  editedManga.value = mangaOriginal
+}
 
 const changeStatus = (newStatus: Manga['status']) => {
   if (editedManga.value) {
-    editedManga.value.status = newStatus;
-    salvarEdicao();
+    editedManga.value.status = newStatus
+    salvarEdicao()
   }
-};
-
+}
 const incrementarCapitulo = () => {
   if (
     editedManga.value &&
     editedManga.value.capitulosLidos !== undefined &&
     editedManga.value.capitulos
   ) {
-    const totalCapitulos = Number(editedManga.value.capitulos);
+    const totalCapitulos = Number(editedManga.value.capitulos)
     if (isNaN(totalCapitulos) || editedManga.value.capitulosLidos < totalCapitulos) {
-      editedManga.value.capitulosLidos++;
-      salvarEdicao();
+      editedManga.value.capitulosLidos++
+      salvarEdicao()
     }
   }
-};
-
+}
 const decrementarCapitulo = () => {
   if (
     editedManga.value &&
     editedManga.value.capitulosLidos &&
     editedManga.value.capitulosLidos > 0
   ) {
-    editedManga.value.capitulosLidos--;
-    salvarEdicao();
+    editedManga.value.capitulosLidos--
+    salvarEdicao()
   }
-};
-
+}
+const addLink = () => {
+  if (!editedManga.value.linksLeitura) {
+    editedManga.value.linksLeitura = []
+  }
+  editedManga.value.linksLeitura.push('')
+}
+const removeLink = (index: number) => {
+  if (editedManga.value.linksLeitura) {
+    editedManga.value.linksLeitura.splice(index, 1)
+  }
+}
 const statusClass = computed(() => {
-  if (!manga.value) return '';
-  switch (manga.value.status) {
-    case 'Lendo':
-      return 'reading';
-    case 'Lido':
-      return 'read';
-    case 'Quero Ler':
-      return 'planned';
-    case 'Abandonado':
-      return 'abandoned';
-    default:
-      return '';
-  }
-});
-
+  /* ...código existente... */
+})
 onMounted(() => {
-  carregarManga();
-});
-
+  carregarManga()
+})
 watch(
   () => route.params.id,
   () => {
-    carregarManga();
+    carregarManga()
   },
-);
+)
+
+// Colando o resto das funções para garantir
+const openUpdateConfirmation = () => {
+  if (!manga.value) return
+  confirmationTitle.value = 'Confirmar Atualização'
+  if (manga.value.isManual) {
+    confirmationMessage.value = `Este item foi adicionado <strong>manualmente</strong>. Atualizar com dados da internet pode sobrescrever suas informações.<br><br>Deseja continuar?`
+  } else {
+    confirmationMessage.value =
+      'Isso buscará as informações mais recentes e as atualizará. Seus dados pessoais serão mantidos.<br><br>Deseja continuar?'
+  }
+  showConfirmationModal.value = true
+}
+const handleConfirmUpdate = async () => {
+  showConfirmationModal.value = false
+  if (!manga.value) return
+  isUpdating.value = true
+  toast.info(`Buscando por atualizações para "${manga.value.titulo}"...`)
+  const { data: resultados, error } = await fetchMangaData(manga.value.titulo)
+  isUpdating.value = false
+  if (error) {
+    toast.error('Falha ao buscar atualizações.')
+    return
+  }
+  if (resultados && resultados.length > 0) {
+    searchResults.value = resultados
+    showSelectionModal.value = true
+  } else {
+    toast.warning('Nenhuma atualização encontrada para este título.')
+  }
+}
+const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
+  if (!manga.value) return
+  const mangaParaSalvar: Manga = {
+    ...selectedManga,
+    status: manga.value.status,
+    capitulosLidos: manga.value.capitulosLidos,
+    linksLeitura: manga.value.linksLeitura,
+    isManual: false,
+  }
+  editedManga.value = mangaParaSalvar
+  salvarEdicao(false)
+  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
+  closeSelectionModal()
+}
+const closeSelectionModal = () => {
+  showSelectionModal.value = false
+  searchResults.value = []
+}
+const statusClass = computed(() => {
+  if (!manga.value) return ''
+  switch (manga.value.status) {
+    case 'Lendo':
+      return 'reading'
+    case 'Lido':
+      return 'read'
+    case 'Quero Ler':
+      return 'planned'
+    case 'Abandonado':
+      return 'abandoned'
+    default:
+      return ''
+  }
+})
 </script>
 
 <style scoped>
-/* Adicionando grid e labels para o formulário de edição */
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+/* Estilos para os novos campos de links */
+.read-links-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+.link-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.link-input-group input {
+  flex-grow: 1;
+}
+.remove-link-btn {
+  background-color: var(--remove-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  width: 45px;
+  height: 45px;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.add-link-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 5px;
+  display: inline-block;
+  width: auto;
 }
 div[v-else] label {
   display: block;
@@ -319,7 +463,7 @@ div[v-else] > label {
   margin-top: 15px;
 }
 
-/* Estilos existentes */
+/* Outros estilos */
 #update-btn {
   background-color: var(--primary-color);
   color: white;
@@ -431,6 +575,7 @@ div[v-else] > label {
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
 }
 .info-group > div:last-child {
   border-bottom: none;
@@ -532,7 +677,7 @@ div[v-else] > label {
 .modal-textarea,
 select {
   width: 100%;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   padding: 12px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -544,5 +689,10 @@ select {
 .modal-textarea {
   resize: vertical;
   min-height: 120px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 </style>
