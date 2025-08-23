@@ -238,15 +238,10 @@ const carregarManga = async () => {
     return slug === mangaSlug
   })
   manga.value = encontrado || null
-  editedManga.value = JSON.parse(JSON.stringify(encontrado || {})) // Cópia profunda para edição
+  editedManga.value = JSON.parse(JSON.stringify(encontrado || {}))
 }
 
 const salvarEdicao = async (showToast = false) => {
-  // Antes de salvar, se o campo de capítulos estiver vazio, define como 'N/A'
-  if (editedManga.value.capitulos === '' || editedManga.value.capitulos === null) {
-    editedManga.value.capitulos = 'N/A'
-  }
-
   const mangasSalvos = await getListaDeMangas()
   const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
 
@@ -267,34 +262,60 @@ const salvarEdicao = async (showToast = false) => {
   }
 }
 
+// As outras funções permanecem as mesmas
 const openUpdateConfirmation = () => {
-  /* ...código existente... */
+  if (!manga.value) return
+  confirmationTitle.value = 'Confirmar Atualização'
+  if (manga.value.isManual) {
+    confirmationMessage.value = `Este item foi adicionado <strong>manualmente</strong>. Atualizar com dados da internet pode sobrescrever as suas informações.<br><br>Deseja continuar?`
+  } else {
+    confirmationMessage.value =
+      'Isto buscará as informações mais recentes e as atualizará. Os seus dados pessoais serão mantidos.<br><br>Deseja continuar?'
+  }
+  showConfirmationModal.value = true
 }
 const handleConfirmUpdate = async () => {
-  /* ...código existente... */
+  showConfirmationModal.value = false
+  if (!manga.value) return
+  isUpdating.value = true
+  toast.info(`A procurar por atualizações para "${manga.value.titulo}"...`)
+  const { data: resultados, error } = await fetchMangaData(manga.value.titulo)
+  isUpdating.value = false
+  if (error) {
+    toast.error('Falha ao procurar por atualizações.')
+    return
+  }
+  if (resultados && resultados.length > 0) {
+    searchResults.value = resultados
+    showSelectionModal.value = true
+  } else {
+    toast.warning('Nenhuma atualização encontrada para este título.')
+  }
 }
 const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
-  /* ...código existente... */
+  if (!manga.value) return
+  const mangaParaSalvar: Manga = {
+    ...selectedManga,
+    status: manga.value.status,
+    capitulosLidos: manga.value.capitulosLidos,
+    linksLeitura: manga.value.linksLeitura,
+    isManual: false,
+  }
+  editedManga.value = mangaParaSalvar
+  salvarEdicao(false)
+  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
+  closeSelectionModal()
 }
 const closeSelectionModal = () => {
-  /* ...código existente... */
+  showSelectionModal.value = false
+  searchResults.value = []
 }
-
-// <-- FUNÇÃO MODIFICADA -->
 const toggleEditMode = () => {
   isEditing.value = !isEditing.value
-
-  // Cria uma cópia profunda para evitar problemas de reatividade
-  const mangaOriginal = JSON.parse(JSON.stringify(manga.value || {}))
-
-  // Se o valor dos capítulos for "N/A", transforma em vazio para o input numérico
-  if (mangaOriginal.capitulos === 'N/A') {
-    mangaOriginal.capitulos = ''
+  if (!isEditing.value) {
+    editedManga.value = JSON.parse(JSON.stringify(manga.value || {}))
   }
-
-  editedManga.value = mangaOriginal
 }
-
 const changeStatus = (newStatus: Manga['status']) => {
   if (editedManga.value) {
     editedManga.value.status = newStatus
@@ -336,67 +357,6 @@ const removeLink = (index: number) => {
   }
 }
 const statusClass = computed(() => {
-  /* ...código existente... */
-})
-onMounted(() => {
-  carregarManga()
-})
-watch(
-  () => route.params.id,
-  () => {
-    carregarManga()
-  },
-)
-
-// Colando o resto das funções para garantir
-const openUpdateConfirmation = () => {
-  if (!manga.value) return
-  confirmationTitle.value = 'Confirmar Atualização'
-  if (manga.value.isManual) {
-    confirmationMessage.value = `Este item foi adicionado <strong>manualmente</strong>. Atualizar com dados da internet pode sobrescrever suas informações.<br><br>Deseja continuar?`
-  } else {
-    confirmationMessage.value =
-      'Isso buscará as informações mais recentes e as atualizará. Seus dados pessoais serão mantidos.<br><br>Deseja continuar?'
-  }
-  showConfirmationModal.value = true
-}
-const handleConfirmUpdate = async () => {
-  showConfirmationModal.value = false
-  if (!manga.value) return
-  isUpdating.value = true
-  toast.info(`Buscando por atualizações para "${manga.value.titulo}"...`)
-  const { data: resultados, error } = await fetchMangaData(manga.value.titulo)
-  isUpdating.value = false
-  if (error) {
-    toast.error('Falha ao buscar atualizações.')
-    return
-  }
-  if (resultados && resultados.length > 0) {
-    searchResults.value = resultados
-    showSelectionModal.value = true
-  } else {
-    toast.warning('Nenhuma atualização encontrada para este título.')
-  }
-}
-const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
-  if (!manga.value) return
-  const mangaParaSalvar: Manga = {
-    ...selectedManga,
-    status: manga.value.status,
-    capitulosLidos: manga.value.capitulosLidos,
-    linksLeitura: manga.value.linksLeitura,
-    isManual: false,
-  }
-  editedManga.value = mangaParaSalvar
-  salvarEdicao(false)
-  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
-  closeSelectionModal()
-}
-const closeSelectionModal = () => {
-  showSelectionModal.value = false
-  searchResults.value = []
-}
-const statusClass = computed(() => {
   if (!manga.value) return ''
   switch (manga.value.status) {
     case 'Lendo':
@@ -411,10 +371,20 @@ const statusClass = computed(() => {
       return ''
   }
 })
+
+onMounted(() => {
+  carregarManga()
+})
+
+watch(
+  () => route.params.id,
+  () => {
+    carregarManga()
+  },
+)
 </script>
 
 <style scoped>
-/* Estilos para os novos campos de links */
 .read-links-container {
   display: flex;
   flex-wrap: wrap;
@@ -463,7 +433,6 @@ div[v-else] > label {
   margin-top: 15px;
 }
 
-/* Outros estilos */
 #update-btn {
   background-color: var(--primary-color);
   color: white;

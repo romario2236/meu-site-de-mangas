@@ -102,30 +102,35 @@
               class="filter-status-tag"
               :class="{ selected: statusSelecionado === 'todos' }"
               @click="setStatus('todos')"
+              data-status="todos"
               >Todos</span
             >
             <span
               class="filter-status-tag"
               :class="{ selected: statusSelecionado === 'Quero Ler' }"
               @click="setStatus('Quero Ler')"
+              data-status="Quero Ler"
               >Quero Ler</span
             >
             <span
               class="filter-status-tag"
               :class="{ selected: statusSelecionado === 'Lendo' }"
               @click="setStatus('Lendo')"
+              data-status="Lendo"
               >Lendo</span
             >
             <span
               class="filter-status-tag"
               :class="{ selected: statusSelecionado === 'Lido' }"
               @click="setStatus('Lido')"
+              data-status="Lido"
               >Lido</span
             >
             <span
               class="filter-status-tag"
               :class="{ selected: statusSelecionado === 'Abandonado' }"
               @click="setStatus('Abandonado')"
+              data-status="Abandonado"
               >Abandonado</span
             >
           </div>
@@ -177,11 +182,10 @@
       @mangaSelected="adicionarMangaSelecionado"
     />
     <ManualAddModal
-  v-if="showManualAddModal"
-  :existing-genres="todosOsGenerosOrdenados"
-  @close="showManualAddModal = false"
-  @save="adicionarMangaManual"
-/>
+      v-if="showManualAddModal"
+      :existing-genres="todosOsGenerosOrdenados"
+      @close="showManualAddModal = false"
+      @save="adicionarMangaManual"
     />
   </div>
 </template>
