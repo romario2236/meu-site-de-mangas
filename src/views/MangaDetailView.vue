@@ -163,16 +163,23 @@
             placeholder="Descrição"
           ></textarea>
         </div>
+
         <div class="modal-actions">
-          <template v-if="!isEditing">
+          <template v-if="!isEditing && hasUnsavedChanges">
+            <button class="cancel-btn" @click="cancelarAlteracoesRapidas">Cancelar</button>
+            <button class="save-btn" @click="salvarAlteracoesRapidas">Salvar Alterações</button>
+          </template>
+
+          <template v-if="!isEditing && !hasUnsavedChanges">
             <button id="update-btn" @click="openUpdateConfirmation" :disabled="isUpdating">
               {{ isUpdating ? 'Atualizando...' : 'Atualizar Automaticamente' }}
             </button>
             <button id="edit-btn" @click="toggleEditMode">Editar Detalhes</button>
           </template>
-          <template v-else>
-            <button class="cancel-btn" @click="toggleEditMode">Cancelar</button>
-            <button id="save-edit-btn" @click="salvarEdicao(true)">Salvar Detalhes</button>
+
+          <template v-else-if="isEditing">
+            <button class="cancel-btn" @click="toggleEditMode">Cancelar Edição</button>
+            <button id="save-edit-btn" @click="salvarEdicaoCompleta">Salvar Detalhes</button>
           </template>
         </div>
       </div>
@@ -204,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
@@ -223,6 +230,9 @@ const confirmationMessage = ref('')
 const showSelectionModal = ref(false)
 const searchResults = ref<Manga[]>([])
 
+// NOVO: State para controlar se existem alterações pendentes
+const hasUnsavedChanges = ref(false)
+
 const route = useRoute()
 const toast = useToast()
 
@@ -238,10 +248,13 @@ const carregarManga = async () => {
     return slug === mangaSlug
   })
   manga.value = encontrado || null
+  // Usamos JSON.parse/stringify para criar uma cópia profunda e evitar reatividade indesejada
   editedManga.value = JSON.parse(JSON.stringify(encontrado || {}))
+  hasUnsavedChanges.value = false // Reseta o status de alterações
 }
 
-const salvarEdicao = async (showToast = false) => {
+// FUNÇÃO INTERNA PARA ATUALIZAR O BANCO DE DADOS
+const updateMangaInDatabase = async () => {
   const mangasSalvos = await getListaDeMangas()
   const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
 
@@ -249,20 +262,47 @@ const salvarEdicao = async (showToast = false) => {
     mangasSalvos[index] = editedManga.value as Manga
     try {
       await salvarListaDeMangas(mangasSalvos)
-      manga.value = { ...editedManga.value } as Manga
-      if (showToast) {
-        isEditing.value = false
-        toast.success('Mangá atualizado com sucesso!')
-      }
+      manga.value = { ...editedManga.value } as Manga // Atualiza a visualização principal
     } catch (error) {
-      toast.error('Erro ao salvar alterações.')
+      toast.error('Erro ao salvar alterações no banco de dados.')
+      throw error // Lança o erro para a função que a chamou tratar
     }
   } else {
     toast.error('Erro ao encontrar o mangá para salvar.')
+    throw new Error('Manga não encontrado na lista para atualização.')
   }
 }
 
-// As outras funções permanecem as mesmas
+// NOVA FUNÇÃO: Chamada pelo botão "Salvar Alterações"
+const salvarAlteracoesRapidas = async () => {
+  try {
+    await updateMangaInDatabase()
+    hasUnsavedChanges.value = false // Esconde os botões de salvar/cancelar
+    toast.success('Alterações salvas com sucesso!')
+  } catch (error) {
+    // O erro já é exibido por `updateMangaInDatabase`
+  }
+}
+
+// NOVA FUNÇÃO: Chamada pelo botão "Cancelar" das alterações rápidas
+const cancelarAlteracoesRapidas = () => {
+  // Restaura o estado original a partir da cópia principal
+  editedManga.value = JSON.parse(JSON.stringify(manga.value || {}))
+  hasUnsavedChanges.value = false
+}
+
+// FUNÇÃO EXISTENTE: Agora chamada ao salvar a edição completa
+const salvarEdicaoCompleta = async () => {
+  try {
+    await updateMangaInDatabase()
+    isEditing.value = false
+    hasUnsavedChanges.value = false
+    toast.success('Mangá atualizado com sucesso!')
+  } catch (error) {
+    // O erro já é exibido por `updateMangaInDatabase`
+  }
+}
+
 const openUpdateConfirmation = () => {
   if (!manga.value) return
   confirmationTitle.value = 'Confirmar Atualização'
@@ -274,6 +314,7 @@ const openUpdateConfirmation = () => {
   }
   showConfirmationModal.value = true
 }
+
 const handleConfirmUpdate = async () => {
   showConfirmationModal.value = false
   if (!manga.value) return
@@ -292,7 +333,8 @@ const handleConfirmUpdate = async () => {
     toast.warning('Nenhuma atualização encontrada para este título.')
   }
 }
-const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
+
+const handleMangaSelectedForUpdate = async (selectedManga: Manga) => {
   if (!manga.value) return
   const mangaParaSalvar: Manga = {
     ...selectedManga,
@@ -302,26 +344,37 @@ const handleMangaSelectedForUpdate = (selectedManga: Manga) => {
     isManual: false,
   }
   editedManga.value = mangaParaSalvar
-  salvarEdicao(false)
-  toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
+  try {
+    await updateMangaInDatabase()
+    toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
+  } catch (error) {
+    // O erro já é exibido por `updateMangaInDatabase`
+  }
   closeSelectionModal()
 }
+
 const closeSelectionModal = () => {
   showSelectionModal.value = false
   searchResults.value = []
 }
+
 const toggleEditMode = () => {
   isEditing.value = !isEditing.value
+  // Se o usuário cancelar o modo de edição, restaura os dados originais
   if (!isEditing.value) {
-    editedManga.value = JSON.parse(JSON.stringify(manga.value || {}))
+    cancelarAlteracoesRapidas()
   }
 }
+
+// ALTERADO: Apenas muda o estado local e ativa a flag de "mudanças pendentes"
 const changeStatus = (newStatus: Manga['status']) => {
   if (editedManga.value) {
     editedManga.value.status = newStatus
-    salvarEdicao()
+    hasUnsavedChanges.value = true
   }
 }
+
+// ALTERADO: Apenas muda o estado local e ativa a flag de "mudanças pendentes"
 const incrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -331,10 +384,12 @@ const incrementarCapitulo = () => {
     const totalCapitulos = Number(editedManga.value.capitulos)
     if (isNaN(totalCapitulos) || editedManga.value.capitulosLidos < totalCapitulos) {
       editedManga.value.capitulosLidos++
-      salvarEdicao()
+      hasUnsavedChanges.value = true
     }
   }
 }
+
+// ALTERADO: Apenas muda o estado local e ativa a flag de "mudanças pendentes"
 const decrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -342,35 +397,22 @@ const decrementarCapitulo = () => {
     editedManga.value.capitulosLidos > 0
   ) {
     editedManga.value.capitulosLidos--
-    salvarEdicao()
+    hasUnsavedChanges.value = true
   }
 }
+
 const addLink = () => {
   if (!editedManga.value.linksLeitura) {
     editedManga.value.linksLeitura = []
   }
   editedManga.value.linksLeitura.push('')
 }
+
 const removeLink = (index: number) => {
   if (editedManga.value.linksLeitura) {
     editedManga.value.linksLeitura.splice(index, 1)
   }
 }
-const statusClass = computed(() => {
-  if (!manga.value) return ''
-  switch (manga.value.status) {
-    case 'Lendo':
-      return 'reading'
-    case 'Lido':
-      return 'read'
-    case 'Quero Ler':
-      return 'planned'
-    case 'Abandonado':
-      return 'abandoned'
-    default:
-      return ''
-  }
-})
 
 onMounted(() => {
   carregarManga()
@@ -385,6 +427,15 @@ watch(
 </script>
 
 <style scoped>
+/* NOVO ESTILO PARA O BOTÃO DE SALVAR ALTERAÇÕES RÁPIDAS */
+.save-btn {
+  background-color: var(--save-color);
+  color: white;
+}
+.save-btn:hover {
+  background-color: #27ae60;
+}
+
 .read-links-container {
   display: flex;
   flex-wrap: wrap;
