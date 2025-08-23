@@ -229,8 +229,6 @@ const confirmationTitle = ref('')
 const confirmationMessage = ref('')
 const showSelectionModal = ref(false)
 const searchResults = ref<Manga[]>([])
-
-// NOVO: State para controlar se existem alterações pendentes
 const hasUnsavedChanges = ref(false)
 
 const route = useRoute()
@@ -248,12 +246,10 @@ const carregarManga = async () => {
     return slug === mangaSlug
   })
   manga.value = encontrado || null
-  // Usamos JSON.parse/stringify para criar uma cópia profunda e evitar reatividade indesejada
   editedManga.value = JSON.parse(JSON.stringify(encontrado || {}))
-  hasUnsavedChanges.value = false // Reseta o status de alterações
+  hasUnsavedChanges.value = false
 }
 
-// FUNÇÃO INTERNA PARA ATUALIZAR O BANCO DE DADOS
 const updateMangaInDatabase = async () => {
   const mangasSalvos = await getListaDeMangas()
   const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
@@ -262,10 +258,10 @@ const updateMangaInDatabase = async () => {
     mangasSalvos[index] = editedManga.value as Manga
     try {
       await salvarListaDeMangas(mangasSalvos)
-      manga.value = { ...editedManga.value } as Manga // Atualiza a visualização principal
+      manga.value = { ...editedManga.value } as Manga
     } catch (error) {
       toast.error('Erro ao salvar alterações no banco de dados.')
-      throw error // Lança o erro para a função que a chamou tratar
+      throw error
     }
   } else {
     toast.error('Erro ao encontrar o mangá para salvar.')
@@ -273,33 +269,28 @@ const updateMangaInDatabase = async () => {
   }
 }
 
-// NOVA FUNÇÃO: Chamada pelo botão "Salvar Alterações"
 const salvarAlteracoesRapidas = async () => {
   try {
     await updateMangaInDatabase()
-    hasUnsavedChanges.value = false // Esconde os botões de salvar/cancelar
+    hasUnsavedChanges.value = false
     toast.success('Alterações salvas com sucesso!')
   } catch (error) {
-    // O erro já é exibido por `updateMangaInDatabase`
+    // O erro já é tratado na função `updateMangaInDatabase`
   }
 }
 
-// NOVA FUNÇÃO: Chamada pelo botão "Cancelar" das alterações rápidas
 const cancelarAlteracoesRapidas = () => {
-  // Restaura o estado original a partir da cópia principal
   editedManga.value = JSON.parse(JSON.stringify(manga.value || {}))
-  hasUnsavedChanges.value = false
+  // O 'watch' abaixo irá automaticamente setar 'hasUnsavedChanges' para false
 }
 
-// FUNÇÃO EXISTENTE: Agora chamada ao salvar a edição completa
 const salvarEdicaoCompleta = async () => {
   try {
     await updateMangaInDatabase()
     isEditing.value = false
-    hasUnsavedChanges.value = false
     toast.success('Mangá atualizado com sucesso!')
   } catch (error) {
-    // O erro já é exibido por `updateMangaInDatabase`
+    // O erro já é tratado na função `updateMangaInDatabase`
   }
 }
 
@@ -348,7 +339,7 @@ const handleMangaSelectedForUpdate = async (selectedManga: Manga) => {
     await updateMangaInDatabase()
     toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
   } catch (error) {
-    // O erro já é exibido por `updateMangaInDatabase`
+    // O erro já é tratado na função `updateMangaInDatabase`
   }
   closeSelectionModal()
 }
@@ -360,21 +351,17 @@ const closeSelectionModal = () => {
 
 const toggleEditMode = () => {
   isEditing.value = !isEditing.value
-  // Se o usuário cancelar o modo de edição, restaura os dados originais
   if (!isEditing.value) {
     cancelarAlteracoesRapidas()
   }
 }
 
-// ALTERADO: Apenas muda o estado local e ativa a flag de "mudanças pendentes"
 const changeStatus = (newStatus: Manga['status']) => {
   if (editedManga.value) {
     editedManga.value.status = newStatus
-    hasUnsavedChanges.value = true
   }
 }
 
-// ALTERADO: Apenas muda o estado local e ativa a flag de "mudanças pendentes"
 const incrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -384,12 +371,10 @@ const incrementarCapitulo = () => {
     const totalCapitulos = Number(editedManga.value.capitulos)
     if (isNaN(totalCapitulos) || editedManga.value.capitulosLidos < totalCapitulos) {
       editedManga.value.capitulosLidos++
-      hasUnsavedChanges.value = true
     }
   }
 }
 
-// ALTERADO: Apenas muda o estado local e ativa a flag de "mudanças pendentes"
 const decrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -397,7 +382,6 @@ const decrementarCapitulo = () => {
     editedManga.value.capitulosLidos > 0
   ) {
     editedManga.value.capitulosLidos--
-    hasUnsavedChanges.value = true
   }
 }
 
@@ -414,6 +398,24 @@ const removeLink = (index: number) => {
   }
 }
 
+// NOVO 'WATCH': Observa o objeto editedManga para qualquer mudança
+watch(
+  editedManga,
+  (newValue) => {
+    if (!manga.value || isEditing.value) {
+      hasUnsavedChanges.value = false
+      return
+    }
+    // Compara o estado original com o estado editado
+    const originalMangaString = JSON.stringify(manga.value)
+    const editedMangaString = JSON.stringify(newValue)
+
+    // Se forem diferentes, mostra os botões de salvar/cancelar
+    hasUnsavedChanges.value = originalMangaString !== editedMangaString
+  },
+  { deep: true },
+) // 'deep: true' é crucial para observar mudanças dentro do objeto
+
 onMounted(() => {
   carregarManga()
 })
@@ -427,7 +429,6 @@ watch(
 </script>
 
 <style scoped>
-/* NOVO ESTILO PARA O BOTÃO DE SALVAR ALTERAÇÕES RÁPIDAS */
 .save-btn {
   background-color: var(--save-color);
   color: white;
@@ -435,7 +436,6 @@ watch(
 .save-btn:hover {
   background-color: #27ae60;
 }
-
 .read-links-container {
   display: flex;
   flex-wrap: wrap;
