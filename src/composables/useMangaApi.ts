@@ -14,21 +14,32 @@ export async function fetchMangaData(nomeManga: string) {
       fetch(kitsuUrl).then(res => res.json()),
       fetch(mangadexUrl).then(res => res.json()),
     ]);
+
     let todosOsResultados: Manga[] = [];
+
     if (responses[0].status === 'fulfilled' && responses[0].value.data) {
       todosOsResultados.push(...responses[0].value.data.map(formatarDadosJikan));
     }
+
     if (responses[1].status === 'fulfilled' && responses[1].value.data) {
       todosOsResultados.push(...responses[1].value.data.map(formatarDadosKitsu));
     }
+
+    // ALTERAÇÃO NA LÓGICA DA MANGADEX
     if (responses[2].status === 'fulfilled' && responses[2].value.data) {
-      todosOsResultados.push(...responses[2].value.data.map(formatarDadosMangaDex));
+      // A API da Mangadex retorna os dados de capa em um array separado 'relationships'
+      // Precisamos passar esse array para a função de formatação
+      const mangadexResponse = responses[2].value;
+      todosOsResultados.push(...mangadexResponse.data.map((manga: any) => formatarDadosMangaDex(manga, mangadexResponse.relationships)));
     }
+
     if (todosOsResultados.length === 0) {
       return { data: null, error: "Mangá não encontrado." };
     }
+
     const resultadosUnicos = Array.from(new Map(todosOsResultados.map(item => [item.titulo.toLowerCase(), item])).values());
     return { data: resultadosUnicos, error: null };
+
   } catch (error) {
     return { data: null, error: "Erro de conexão." };
   }
@@ -44,7 +55,7 @@ function formatarDadosJikan(resultado: any): Manga {
     capitulos: resultado.chapters || 'N/A',
     nomesAlternativos: resultado.titles.filter((t: any) => t.type !== 'Default').map((t: any) => t.title).join(', ') || 'N/A',
     status: 'Quero Ler', capitulosLidos: 0, tipo, isManual: false,
-    linksLeitura: [], // <-- MUDANÇA
+    linksLeitura: [],
   };
 }
 
@@ -58,22 +69,36 @@ function formatarDadosKitsu(resultado: any): Manga {
     capitulos: resultado.attributes.chapterCount || 'N/A',
     nomesAlternativos: resultado.attributes.titles.ja_jp || 'N/A',
     status: 'Quero Ler', capitulosLidos: 0, tipo, isManual: false,
-    linksLeitura: [], // <-- MUDANÇA
+    linksLeitura: [],
   };
 }
 
-function formatarDadosMangaDex(resultado: any): Manga {
-    const coverArt = resultado.relationships.find((rel: any) => rel.type === 'cover_art');
-    const coverFileName = coverArt?.attributes?.fileName;
-    const capaUrl = coverFileName ? `https://uploads.mangadex.org/covers/${resultado.id}/${coverFileName}` : '';
+// FUNÇÃO DA MANGADEX TOTALMENTE ALTERADA
+function formatarDadosMangaDex(resultado: any, relationships: any[]): Manga {
+    // 1. Encontra a relação da capa para pegar o ID dela
+    const coverArtRelationship = resultado.relationships.find((rel: any) => rel.type === 'cover_art');
+    const coverId = coverArtRelationship?.id;
+    let capaUrl = '';
+
+    // 2. Se encontrou um ID de capa, procura nos dados de relacionamento pelo nome do arquivo
+    if (coverId && relationships) {
+        const coverData = relationships.find((rel: any) => rel.type === 'cover_art' && rel.id === coverId);
+        const coverFileName = coverData?.attributes?.fileName;
+        if (coverFileName) {
+            // 3. Monta a URL completa da capa
+            capaUrl = `https://uploads.mangadex.org/covers/${resultado.id}/${coverFileName}`;
+        }
+    }
+
     const titles = resultado.attributes.title;
     const descriptions = resultado.attributes.description;
     const tituloPrincipal = titles.en || titles['pt-br'] || titles.es || titles['ja-ro'] || Object.values(titles)[0];
     const descricaoPrincipal = descriptions.en || descriptions['pt-br'] || descriptions.es || Object.values(descriptions)[0] || 'N/A';
     const tipo = resultado.attributes.publicationDemographic || 'Manga';
+
     return {
         titulo: tituloPrincipal,
-        capaUrl: capaUrl,
+        capaUrl: capaUrl, // A URL da capa agora será encontrada corretamente
         descricao: descricaoPrincipal,
         generos: resultado.attributes.tags.filter((tag: any) => tag.attributes.group === 'genre').map((tag: any) => tag.attributes.name.en).join(', ') || 'N/A',
         capitulos: resultado.attributes.lastChapter || 'N/A',
@@ -81,6 +106,6 @@ function formatarDadosMangaDex(resultado: any): Manga {
         status: 'Quero Ler', capitulosLidos: 0,
         tipo: tipo.charAt(0).toUpperCase() + tipo.slice(1),
         isManual: false,
-        linksLeitura: [], // <-- MUDANÇA
+        linksLeitura: [],
     };
 }
