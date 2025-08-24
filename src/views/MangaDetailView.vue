@@ -49,23 +49,25 @@
             </div>
             <div><strong>Gêneros:</strong> {{ manga.generos }}</div>
             <div><strong>Nomes Alternativos:</strong> {{ manga.nomesAlternativos }}</div>
+
             <div v-if="manga.linksLeitura && manga.linksLeitura.length > 0">
               <strong>Onde Ler:</strong>
               <div class="read-links-container">
                 <a
                   v-for="(link, index) in manga.linksLeitura"
                   :key="index"
-                  :href="link"
+                  :href="link.url"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="read-link"
                 >
-                  Acessar Link {{ manga.linksLeitura.length > 1 ? index + 1 : '' }}
+                  {{ link.nome }}
                 </a>
               </div>
             </div>
           </div>
         </div>
+
         <div v-else>
           <h1>Editar Mangá</h1>
           <label>Título</label>
@@ -87,13 +89,21 @@
           <div
             v-for="(link, index) in editedManga.linksLeitura"
             :key="index"
-            class="link-input-group"
+            class="link-edit-group"
           >
             <input
-              type="url"
-              v-model="editedManga.linksLeitura[index]"
+              type="text"
+              v-model="link.nome"
+              placeholder="Nome do Site"
               class="modal-input"
-              placeholder="https://..."
+              required
+            />
+            <input
+              type="url"
+              v-model="link.url"
+              placeholder="URL do Link"
+              class="modal-input"
+              required
             />
             <button class="remove-link-btn" @click="removeLink(index)">×</button>
           </div>
@@ -168,14 +178,12 @@
             <button class="cancel-btn" @click="cancelarAlteracoesRapidas">Cancelar</button>
             <button class="save-btn" @click="salvarAlteracoesRapidas">Salvar Alterações</button>
           </template>
-
           <template v-if="!isEditing && !hasUnsavedChanges">
             <button id="update-btn" @click="openUpdateConfirmation" :disabled="isUpdating">
               {{ isUpdating ? 'Atualizando...' : 'Atualizar Automaticamente' }}
             </button>
             <button id="edit-btn" @click="toggleEditMode">Editar Detalhes</button>
           </template>
-
           <template v-else-if="isEditing">
             <button class="cancel-btn" @click="toggleEditMode">Cancelar Edição</button>
             <button id="save-edit-btn" @click="salvarEdicaoCompleta">Salvar Detalhes</button>
@@ -187,10 +195,7 @@
         <p>{{ manga.descricao }}</p>
       </div>
     </div>
-    <div v-else class="not-found">
-      <h1>Mangá não encontrado</h1>
-    </div>
-
+    <div v-else class="not-found"><h1>Mangá não encontrado</h1></div>
     <ConfirmationModal
       v-if="showConfirmationModal"
       :title="confirmationTitle"
@@ -215,7 +220,7 @@ import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
 import { getListaDeMangas, salvarListaDeMangas } from '@/firebase/firestoreService'
-import type { Manga } from '@/types'
+import type { Manga } from '@/types' // A importação da Manga já inclui a de LinkLeitura
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
 
@@ -244,11 +249,38 @@ const carregarManga = async () => {
       .replace(/^-+|-+$/g, '')
     return slug === mangaSlug
   })
-  manga.value = encontrado || null
-  editedManga.value = JSON.parse(JSON.stringify(encontrado || {}))
+
+  if (encontrado) {
+    // Garante que linksLeitura seja sempre um array
+    if (!Array.isArray(encontrado.linksLeitura)) {
+      encontrado.linksLeitura = []
+    }
+    manga.value = encontrado
+    editedManga.value = JSON.parse(JSON.stringify(encontrado))
+  } else {
+    manga.value = null
+    editedManga.value = {}
+  }
   hasUnsavedChanges.value = false
 }
 
+// ... (o resto do script continua o mesmo, mas a função addLink e removeLink precisam de ajustes)
+
+const addLink = () => {
+  if (!editedManga.value.linksLeitura) {
+    editedManga.value.linksLeitura = []
+  }
+  // ALTERADO: Adiciona um objeto com nome e url
+  editedManga.value.linksLeitura.push({ nome: '', url: '' })
+}
+
+const removeLink = (index: number) => {
+  if (editedManga.value.linksLeitura) {
+    editedManga.value.linksLeitura.splice(index, 1)
+  }
+}
+
+// --- O restante do script permanece o mesmo ---
 const updateMangaInDatabase = async () => {
   const mangasSalvos = await getListaDeMangas()
   const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
@@ -267,44 +299,33 @@ const updateMangaInDatabase = async () => {
     throw new Error('Manga não encontrado na lista para atualização.')
   }
 }
-
 const salvarAlteracoesRapidas = async () => {
   try {
     await updateMangaInDatabase()
     hasUnsavedChanges.value = false
     toast.success('Alterações salvas com sucesso!')
-  } catch (error) {
-    // O erro já é tratado na função `updateMangaInDatabase`
-  }
+  } catch (error) {}
 }
-
 const cancelarAlteracoesRapidas = () => {
   editedManga.value = JSON.parse(JSON.stringify(manga.value || {}))
-  // O 'watch' abaixo irá automaticamente setar 'hasUnsavedChanges' para false
 }
-
 const salvarEdicaoCompleta = async () => {
   try {
     await updateMangaInDatabase()
     isEditing.value = false
     toast.success('Mangá atualizado com sucesso!')
-  } catch (error) {
-    // O erro já é tratado na função `updateMangaInDatabase`
-  }
+  } catch (error) {}
 }
-
 const openUpdateConfirmation = () => {
   if (!manga.value) return
   confirmationTitle.value = 'Confirmar Atualização'
   if (manga.value.isManual) {
     confirmationMessage.value = `Este item foi adicionado <strong>manualmente</strong>. Atualizar com dados da internet pode sobrescrever as suas informações.<br><br>Deseja continuar?`
   } else {
-    confirmationMessage.value =
-      'Isto buscará as informações mais recentes e as atualizará. Os seus dados pessoais serão mantidos.<br><br>Deseja continuar?'
+    confirmationMessage.value = `Isto buscará as informações mais recentes e as atualizará. Os seus dados pessoais serão mantidos.<br><br>Deseja continuar?`
   }
   showConfirmationModal.value = true
 }
-
 const handleConfirmUpdate = async () => {
   showConfirmationModal.value = false
   if (!manga.value) return
@@ -323,7 +344,6 @@ const handleConfirmUpdate = async () => {
     toast.warning('Nenhuma atualização encontrada para este título.')
   }
 }
-
 const handleMangaSelectedForUpdate = async (selectedManga: Manga) => {
   if (!manga.value) return
   const mangaParaSalvar: Manga = {
@@ -337,30 +357,24 @@ const handleMangaSelectedForUpdate = async (selectedManga: Manga) => {
   try {
     await updateMangaInDatabase()
     toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
-  } catch (error) {
-    // O erro já é tratado na função `updateMangaInDatabase`
-  }
+  } catch (error) {}
   closeSelectionModal()
 }
-
 const closeSelectionModal = () => {
   showSelectionModal.value = false
   searchResults.value = []
 }
-
 const toggleEditMode = () => {
   isEditing.value = !isEditing.value
   if (!isEditing.value) {
     cancelarAlteracoesRapidas()
   }
 }
-
 const changeStatus = (newStatus: Manga['status']) => {
   if (editedManga.value) {
     editedManga.value.status = newStatus
   }
 }
-
 const incrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -373,7 +387,6 @@ const incrementarCapitulo = () => {
     }
   }
 }
-
 const decrementarCapitulo = () => {
   if (
     editedManga.value &&
@@ -383,21 +396,6 @@ const decrementarCapitulo = () => {
     editedManga.value.capitulosLidos--
   }
 }
-
-const addLink = () => {
-  if (!editedManga.value.linksLeitura) {
-    editedManga.value.linksLeitura = []
-  }
-  editedManga.value.linksLeitura.push('')
-}
-
-const removeLink = (index: number) => {
-  if (editedManga.value.linksLeitura) {
-    editedManga.value.linksLeitura.splice(index, 1)
-  }
-}
-
-// NOVO 'WATCH': Observa o objeto editedManga para qualquer mudança
 watch(
   editedManga,
   (newValue) => {
@@ -405,20 +403,15 @@ watch(
       hasUnsavedChanges.value = false
       return
     }
-    // Compara o estado original com o estado editado
     const originalMangaString = JSON.stringify(manga.value)
     const editedMangaString = JSON.stringify(newValue)
-
-    // Se forem diferentes, mostra os botões de salvar/cancelar
     hasUnsavedChanges.value = originalMangaString !== editedMangaString
   },
   { deep: true },
-) // 'deep: true' é crucial para observar mudanças dentro do objeto
-
+)
 onMounted(() => {
   carregarManga()
 })
-
 watch(
   () => route.params.id,
   () => {
@@ -428,27 +421,13 @@ watch(
 </script>
 
 <style scoped>
-.save-btn {
-  background-color: var(--save-color);
-  color: white;
-}
-.save-btn:hover {
-  background-color: #27ae60;
-}
-.read-links-container {
-  display: flex;
-  flex-wrap: wrap;
+/* ESTILOS NOVOS E ALTERADOS */
+.link-edit-group {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr auto;
   gap: 10px;
-  width: 100%;
-}
-.link-input-group {
-  display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.link-input-group input {
-  flex-grow: 1;
+  margin-bottom: 15px;
 }
 .remove-link-btn {
   background-color: var(--remove-color);
@@ -469,30 +448,24 @@ watch(
   border-radius: 6px;
   cursor: pointer;
   margin-top: 5px;
+  margin-bottom: 15px;
   display: inline-block;
   width: auto;
 }
-div[v-else] label {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--subtle-text-color);
-}
-div[v-else] > label {
-  margin-top: 15px;
-}
 
-#update-btn {
-  background-color: var(--primary-color);
+/* ESTILOS EXISTENTES */
+.save-btn {
+  background-color: var(--save-color);
   color: white;
 }
-#update-btn:hover {
-  background-color: #2980b9;
+.save-btn:hover {
+  background-color: #27ae60;
 }
-#update-btn:disabled {
-  background-color: var(--border-color);
-  cursor: not-allowed;
+.read-links-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
 }
 .read-link {
   background-color: var(--primary-color);

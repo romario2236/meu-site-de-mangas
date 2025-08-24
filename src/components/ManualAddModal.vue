@@ -59,25 +59,20 @@
         </div>
 
         <div class="form-group">
-          <label for="linkLeitura">Links para Leitura</label>
-          <div class="link-input-group">
+          <label>Links para Leitura</label>
+          <div v-if="links.length === 0" class="no-links-message">Nenhum link adicionado.</div>
+          <div v-for="(link, index) in links" :key="index" class="link-input-group">
             <input
-              type="url"
-              id="linkLeitura"
-              v-model="newLinkInput"
-              placeholder="https://..."
-              @keydown.enter.prevent="addLink"
+              type="text"
+              v-model="link.nome"
+              placeholder="Nome do Site (ex: MangaLivre)"
+              required
             />
-            <button type="button" @click="addLink">+</button>
+            <input type="url" v-model="link.url" placeholder="URL do link (https://...)" required />
+            <button type="button" class="remove-link-btn" @click="removeLink(index)">×</button>
           </div>
-          <ul class="link-list" v-if="links.length > 0">
-            <li v-for="(link, index) in links" :key="index">
-              <span>{{ link }}</span>
-              <button type="button" @click="removeLink(index)">×</button>
-            </li>
-          </ul>
+          <button type="button" class="add-link-btn" @click="addLink">Adicionar Link</button>
         </div>
-
         <div class="form-group">
           <label for="descricao">Descrição</label>
           <textarea id="descricao" v-model="novoManga.descricao" rows="4"></textarea>
@@ -94,7 +89,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { Manga } from '@/types'
+import type { Manga, LinkLeitura } from '@/types'
 
 const props = defineProps<{
   existingGenres: string[]
@@ -116,15 +111,13 @@ const novoManga = ref<
 
 const selectedGenres = ref<string[]>([])
 const newGenreInput = ref('')
-const links = ref<string[]>([])
-const newLinkInput = ref('')
+
+// ALTERADO: A variável 'links' agora é uma lista de objetos
+const links = ref<LinkLeitura[]>([])
 
 const addLink = () => {
-  const newLink = newLinkInput.value.trim()
-  if (newLink && links.value.indexOf(newLink) === -1) {
-    links.value.push(newLink)
-  }
-  newLinkInput.value = ''
+  // ALTERADO: Adiciona um objeto com nome e url vazios
+  links.value.push({ nome: '', url: '' })
 }
 
 const removeLink = (index: number) => {
@@ -153,7 +146,7 @@ const handleSubmit = () => {
   const mangaCompleto: Manga = {
     ...novoManga.value,
     generos: generosTratado,
-    linksLeitura: links.value,
+    linksLeitura: links.value, // ALTERADO: Já está no formato correto
     capitulos: 'N/A',
     capitulosLidos: 0,
     nomesAlternativos: 'N/A',
@@ -172,42 +165,40 @@ watch(
 </script>
 
 <style scoped>
-/* ESTILOS PARA O CAMPO DE LINKS */
+/* ESTILOS ALTERADOS E NOVOS */
 .link-input-group {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1.5fr auto;
   gap: 10px;
-}
-.link-input-group input {
-  flex-grow: 1;
-}
-.link-input-group button {
-  flex-shrink: 0;
-  width: 50px;
-  font-size: 1.5rem;
-}
-.link-list {
-  list-style: none;
-  padding: 0;
-  margin-top: 15px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.link-list li {
-  display: flex;
-  justify-content: space-between;
+  margin-bottom: 10px;
   align-items: center;
-  background-color: var(--bg-color);
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 0.9rem;
 }
-.link-list li button {
-  background: none;
+.remove-link-btn {
+  background-color: var(--remove-color);
+  color: white;
   border: none;
-  color: var(--remove-color);
-  font-size: 1.2rem;
-  padding: 0 5px;
+  border-radius: 8px;
+  width: 45px;
+  height: 45px;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.add-link-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 10px;
+  display: inline-block;
+  width: auto;
+}
+.no-links-message {
+  color: var(--subtle-text-color);
+  margin-bottom: 10px;
+  font-style: italic;
 }
 
 /* ESTILOS EXISTENTES */
