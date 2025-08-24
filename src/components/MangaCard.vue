@@ -1,6 +1,12 @@
 <template>
   <router-link :to="mangaDetailUrl" class="manga-link">
     <li class="manga-item">
+      <div class="chapter-overlay">
+        <span class="chapter-count">
+          {{ manga.capitulosLidos }} / {{ manga.capitulos === 'N/A' ? '?' : manga.capitulos }}
+        </span>
+        <span class="chapter-label">Lidos / Total</span>
+      </div>
       <img :src="manga.capaUrl" :alt="'Capa do mangá ' + manga.titulo">
       <span class="manga-nome">{{ manga.titulo }}</span>
       <button class="remover-btn" @click.prevent="$emit('removerManga', manga)">×</button>
@@ -19,6 +25,7 @@ const props = defineProps<{
 defineEmits(['removerManga']);
 
 const mangaDetailUrl = computed(() => {
+  // A lógica para criar a URL permanece a mesma
   const slug = props.manga.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return `/manga/${slug}`;
 });
@@ -39,8 +46,9 @@ const mangaDetailUrl = computed(() => {
     width: 200px;
     text-align: center;
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    position: relative;
+    position: relative; /* Essencial para o posicionamento da camada */
     cursor: pointer;
+    overflow: hidden; /* Garante que a camada não passe das bordas arredondadas */
 }
 .manga-item:hover {
     transform: translateY(-5px);
@@ -82,9 +90,48 @@ const mangaDetailUrl = computed(() => {
     justify-content: center;
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
-    z-index: 2;
+    z-index: 2; /* Garante que o botão de remover fique sobre a camada */
 }
 .manga-item:hover .remover-btn {
     opacity: 1;
 }
+
+/* INÍCIO DA ALTERAÇÃO: Estilos para a nova camada de capítulos */
+.chapter-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.75); /* Fundo escuro semitransparente */
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  opacity: 0; /* Começa invisível */
+  transition: opacity 0.3s ease-in-out; /* Transição suave */
+  z-index: 1; /* Para ficar acima da imagem mas abaixo do botão de remover */
+  padding: 16px; /* Adiciona um respiro nas laterais */
+  box-sizing: border-box;
+}
+
+.manga-item:hover .chapter-overlay {
+  opacity: 1; /* Fica visível no hover */
+}
+
+.chapter-count {
+  font-size: 2rem; /* Tamanho para os números */
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.chapter-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+/* FIM DA ALTERAÇÃO */
 </style>
