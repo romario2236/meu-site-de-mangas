@@ -98,7 +98,7 @@
             <button class="remove-link-btn" @click="removeLink(index)">×</button>
           </div>
           <button type="button" class="add-link-btn" @click="addLink">Adicionar outro link</button>
-
+()
           <label>Gêneros (separados por vírgula)</label>
           <input
             type="text"
