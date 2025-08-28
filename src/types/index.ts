@@ -1,6 +1,5 @@
 // src/types/index.ts
 
-// NOVO: Criamos uma interface específica para os links
 export interface LinkLeitura {
   nome: string;
   url: string;
@@ -15,7 +14,12 @@ export interface Manga {
   nomesAlternativos: string;
   status: 'Quero Ler' | 'Lendo' | 'Lido' | 'Abandonado';
   capitulosLidos: number;
-  linksLeitura: LinkLeitura[]; // <-- MUDANÇA PRINCIPAL AQUI
+  linksLeitura: LinkLeitura[];
   tipo: string;
   isManual: boolean;
+}
+
+// NOVO: Definimos como será a estrutura de todas as suas listas
+export interface MangaCollection {
+  [listName: string]: Manga[];
 }

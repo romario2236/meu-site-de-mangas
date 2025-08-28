@@ -27,6 +27,30 @@
 
     <div class="page-container">
       <aside class="sidebar">
+        <div class="list-management-section">
+          <h3>Minhas Listas</h3>
+          <div class="organize-group">
+            <label for="list-select">Lista Atual:</label>
+            <select id="list-select" v-model="listaAtiva">
+              <option v-for="listName in nomesDasListas" :key="listName" :value="listName">
+                {{ listName }}
+              </option>
+            </select>
+          </div>
+          <div class="organize-group">
+            <label for="new-list-name">Criar Nova Lista:</label>
+            <div class="new-list-form">
+              <input
+                type="text"
+                id="new-list-name"
+                v-model="novaListaNome"
+                placeholder="Nome da nova lista"
+                @keyup.enter="criarNovaLista"
+              />
+              <button @click="criarNovaLista">+</button>
+            </div>
+          </div>
+        </div>
         <h3>Filtros e Ordenação</h3>
         <div class="organize-group">
           <label for="search-local">Pesquisar por Nome:</label>
@@ -158,9 +182,9 @@
       </aside>
 
       <main class="main-content">
-        <h2>Minha Lista de Mangás</h2>
+        <h2>{{ listaAtiva }}</h2>
         <ul id="manga-list">
-          <template v-if="isLoading && mangasLidos.length === 0">
+          <template v-if="isLoading && mangasDaListaAtiva.length === 0">
             <CardSkeleton v-for="n in 3" :key="n" />
           </template>
           <template v-else>
@@ -191,24 +215,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { fazerLogout } from '@/firebase/authService'
-import { escutarListaDeMangas, salvarListaDeMangas } from '@/firebase/firestoreService'
+import { escutarColecaoDeMangas, salvarColecaoDeMangas } from '@/firebase/firestoreService'
 import MangaCard from '@/components/MangaCard.vue'
 import CardSkeleton from '@/components/CardSkeleton.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
 import ManualAddModal from '@/components/ManualAddModal.vue'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
-import type { Manga } from '@/types'
+import type { Manga, MangaCollection } from '@/types'
+
+const router = useRouter()
+const toast = useToast()
 
 const searchResults = ref<Manga[]>([])
 const showSelectionModal = ref(false)
 const showManualAddModal = ref(false)
-const toast = useToast()
+
+// ALTERADO: Gerenciamento de múltiplas listas
+const colecaoDeMangas = ref<MangaCollection>({})
+const listaAtiva = ref<string>('')
+const novaListaNome = ref('')
+
 const mangaInput = ref('')
-const mangasLidos = ref<Manga[]>([])
 const todosOsGeneros = ref(new Set<string>())
 const generoSelecionado = ref<string[]>([])
 const statusSelecionado = ref('todos')
@@ -217,21 +248,39 @@ const sortBy = ref('titulo-asc')
 const isLoading = ref(false)
 const filtroNome = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
-const router = useRouter()
 
 let pararDeEscutar: () => void
 
 onMounted(() => {
-  pararDeEscutar = escutarListaDeMangas((novaLista) => {
-    mangasLidos.value = novaLista
-    todosOsGeneros.value.clear()
-    novaLista.forEach((manga) => {
-      if (manga.generos && manga.generos !== 'N/A') {
-        manga.generos.split(', ').forEach((g: string) => todosOsGeneros.value.add(g.trim()))
-      }
-    })
+  pararDeEscutar = escutarColecaoDeMangas((novaColecao) => {
+    // Se não houver nenhuma lista, cria a primeira
+    if (Object.keys(novaColecao).length === 0) {
+      novaColecao['Minha Lista Principal'] = []
+    }
+    colecaoDeMangas.value = novaColecao
+
+    // Se a lista ativa não existir mais (ex: foi deletada), seleciona a primeira
+    if (!colecaoDeMangas.value[listaAtiva.value]) {
+      listaAtiva.value = Object.keys(novaColecao)[0] || ''
+    }
   })
 })
+
+// Observa a coleção para atualizar a lista de gêneros
+watch(
+  colecaoDeMangas,
+  (novaColecao) => {
+    todosOsGeneros.value.clear()
+    Object.values(novaColecao)
+      .flat()
+      .forEach((manga) => {
+        if (manga.generos && manga.generos !== 'N/A') {
+          manga.generos.split(', ').forEach((g: string) => todosOsGeneros.value.add(g.trim()))
+        }
+      })
+  },
+  { deep: true },
+)
 
 onUnmounted(() => {
   if (pararDeEscutar) {
@@ -239,9 +288,92 @@ onUnmounted(() => {
   }
 })
 
+// NOVAS FUNÇÕES de gerenciamento de lista
+const nomesDasListas = computed(() => Object.keys(colecaoDeMangas.value))
+
+const mangasDaListaAtiva = computed(() => {
+  if (!listaAtiva.value || !colecaoDeMangas.value[listaAtiva.value]) {
+    return []
+  }
+  return colecaoDeMangas.value[listaAtiva.value]
+})
+
+const criarNovaLista = () => {
+  const nome = novaListaNome.value.trim()
+  if (!nome) {
+    toast.warning('O nome da lista não pode ser vazio.')
+    return
+  }
+  if (colecaoDeMangas.value[nome]) {
+    toast.warning(`A lista "${nome}" já existe.`)
+    return
+  }
+  const novaColecao = { ...colecaoDeMangas.value, [nome]: [] }
+  salvarColecaoDeMangas(novaColecao)
+    .then(() => {
+      listaAtiva.value = nome // Seleciona a nova lista criada
+      novaListaNome.value = ''
+      toast.success(`Lista "${nome}" criada com sucesso!`)
+    })
+    .catch(() => {
+      toast.error('Erro ao criar a nova lista.')
+    })
+}
+
+// LÓGICA DE ADIÇÃO E REMOÇÃO ALTERADA
+const adicionarMangaSelecionado = (manga: Manga) => {
+  if (
+    mangasDaListaAtiva.value.some(
+      (item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase(),
+    )
+  ) {
+    toast.info(`"${manga.titulo}" já está na lista "${listaAtiva.value}".`)
+  } else {
+    const novaListaDeMangas = [...mangasDaListaAtiva.value, manga]
+    const novaColecao = { ...colecaoDeMangas.value, [listaAtiva.value]: novaListaDeMangas }
+    salvarColecaoDeMangas(novaColecao)
+      .then(() => {
+        toast.success(`"${manga.titulo}" foi adicionado à lista "${listaAtiva.value}"!`)
+      })
+      .catch((err) => {
+        toast.error('Erro ao salvar o mangá.')
+        console.error(err)
+      })
+  }
+  mangaInput.value = ''
+  closeSelectionModal()
+}
+
+const removerManga = (mangaParaRemover: Manga) => {
+  const novaListaDeMangas = mangasDaListaAtiva.value.filter(
+    (manga) => manga.titulo !== mangaParaRemover.titulo,
+  )
+  const novaColecao = { ...colecaoDeMangas.value, [listaAtiva.value]: novaListaDeMangas }
+  salvarColecaoDeMangas(novaColecao)
+    .then(() => {
+      toast.info(`"${mangaParaRemover.titulo}" foi removido da lista "${listaAtiva.value}".`)
+    })
+    .catch((err) => {
+      toast.error('Erro ao remover o mangá.')
+      console.error(err)
+    })
+}
+
+// O resto das funções (logout, busca, etc.) permanece praticamente igual
 const handleLogout = async () => {
   await fazerLogout()
   router.push('/login')
+}
+const adicionarMangaManual = (novoManga: Manga) => {
+  adicionarMangaSelecionado(novoManga)
+  showManualAddModal.value = false
+}
+const closeSelectionModal = () => {
+  showSelectionModal.value = false
+  searchResults.value = []
+}
+const triggerImportar = () => {
+  fileInput.value?.click()
 }
 
 const buscarManga = async () => {
@@ -264,64 +396,20 @@ const buscarManga = async () => {
   }
 }
 
-const adicionarMangaSelecionado = (manga: Manga) => {
-  if (mangasLidos.value.some((item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase())) {
-    toast.info(`"${manga.titulo}" já está na sua lista.`)
-  } else {
-    const novaLista = [...mangasLidos.value, manga]
-    salvarListaDeMangas(novaLista)
-      .then(() => {
-        toast.success(`"${manga.titulo}" foi adicionado à lista!`)
-      })
-      .catch((err) => {
-        toast.error('Erro ao salvar o mangá.')
-        console.error(err)
-      })
-  }
-  mangaInput.value = ''
-  closeSelectionModal()
-}
-
-const adicionarMangaManual = (novoManga: Manga) => {
-  adicionarMangaSelecionado(novoManga)
-  showManualAddModal.value = false
-}
-
-const removerManga = (mangaParaRemover: Manga) => {
-  const novaLista = mangasLidos.value.filter((manga) => manga.titulo !== mangaParaRemover.titulo)
-  salvarListaDeMangas(novaLista)
-    .then(() => {
-      toast.info(`"${mangaParaRemover.titulo}" foi removido da lista.`)
-    })
-    .catch((err) => {
-      toast.error('Erro ao remover o mangá.')
-      console.error(err)
-    })
-}
-
-const closeSelectionModal = () => {
-  showSelectionModal.value = false
-  searchResults.value = []
-}
-
 const exportarLista = () => {
-  if (mangasLidos.value.length === 0) {
-    toast.info('Sua lista está vazia. Adicione mangás para exportar.')
+  if (mangasDaListaAtiva.value.length === 0) {
+    toast.info('A lista atual está vazia. Adicione mangás para exportar.')
     return
   }
-  const dataStr = JSON.stringify(mangasLidos.value, null, 2)
+  const dataStr = JSON.stringify(mangasDaListaAtiva.value, null, 2)
   const blob = new Blob([dataStr], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = 'minha-lista-de-mangas.json'
+  link.download = `${listaAtiva.value}.json`
   link.click()
   URL.revokeObjectURL(url)
-  toast.success('Lista exportada com sucesso!')
-}
-
-const triggerImportar = () => {
-  fileInput.value?.click()
+  toast.success(`Lista "${listaAtiva.value}" exportada com sucesso!`)
 }
 
 const importarLista = (event: Event) => {
@@ -333,13 +421,18 @@ const importarLista = (event: Event) => {
     try {
       const content = e.target?.result
       if (typeof content !== 'string') throw new Error('Conteúdo do arquivo inválido.')
-      const novaLista: Manga[] = JSON.parse(content)
-      if (!Array.isArray(novaLista) || (novaLista.length > 0 && !novaLista[0].titulo)) {
+      const novaListaImportada: Manga[] = JSON.parse(content)
+      if (
+        !Array.isArray(novaListaImportada) ||
+        (novaListaImportada.length > 0 && !novaListaImportada[0].titulo)
+      ) {
         throw new Error('Formato do arquivo JSON inválido.')
       }
-      salvarListaDeMangas(novaLista)
+
+      const novaColecao = { ...colecaoDeMangas.value, [listaAtiva.value]: novaListaImportada }
+      salvarColecaoDeMangas(novaColecao)
         .then(() => {
-          toast.success('Lista importada com sucesso!')
+          toast.success(`Lista importada para "${listaAtiva.value}" com sucesso!`)
         })
         .catch((err) => {
           toast.error('Erro ao salvar a lista importada.')
@@ -355,7 +448,7 @@ const importarLista = (event: Event) => {
 }
 
 const mangasFiltradosEOrdenados = computed(() => {
-  let mangas = [...mangasLidos.value]
+  let mangas = [...mangasDaListaAtiva.value]
   const termoBusca = filtroNome.value.trim().toLowerCase()
   if (termoBusca) {
     mangas = mangas.filter((manga) => manga.titulo.toLowerCase().includes(termoBusca))
@@ -386,7 +479,6 @@ const mangasFiltradosEOrdenados = computed(() => {
 })
 
 const todosOsGenerosOrdenados = computed(() => Array.from(todosOsGeneros.value).sort())
-
 const toggleGenero = (genero: string) => {
   const index = generoSelecionado.value.indexOf(genero)
   if (index > -1) {
@@ -395,21 +487,38 @@ const toggleGenero = (genero: string) => {
     generoSelecionado.value.push(genero)
   }
 }
-
 const setGenero = (generos: string[]) => {
   generoSelecionado.value = generos
 }
-
 const setStatus = (status: string) => {
   statusSelecionado.value = status
 }
-
 const setTipo = (tipo: string) => {
   tipoSelecionado.value = tipo
 }
 </script>
 
 <style scoped>
+/* NOVOS ESTILOS PARA GERENCIAMENTO DE LISTAS */
+.list-management-section {
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+}
+.new-list-form {
+  display: flex;
+  gap: 10px;
+}
+.new-list-form input {
+  flex-grow: 1;
+}
+.new-list-form button {
+  flex-shrink: 0;
+  width: 50px;
+  font-size: 1.5rem;
+}
+
+/* ESTILOS EXISTENTES */
 .header-top {
   display: flex;
   justify-content: center;
