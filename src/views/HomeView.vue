@@ -51,6 +51,7 @@
             </div>
           </div>
         </div>
+
         <h3>Filtros e Ordenação</h3>
         <div class="organize-group">
           <label for="search-local">Pesquisar por Nome:</label>
@@ -234,7 +235,6 @@ const searchResults = ref<Manga[]>([])
 const showSelectionModal = ref(false)
 const showManualAddModal = ref(false)
 
-// ALTERADO: Gerenciamento de múltiplas listas
 const colecaoDeMangas = ref<MangaCollection>({})
 const listaAtiva = ref<string>('')
 const novaListaNome = ref('')
@@ -253,20 +253,30 @@ let pararDeEscutar: () => void
 
 onMounted(() => {
   pararDeEscutar = escutarColecaoDeMangas((novaColecao) => {
-    // Se não houver nenhuma lista, cria a primeira
+    // INÍCIO DA ALTERAÇÃO
+    // Se a coleção retornada do banco de dados estiver vazia,
+    // criamos e salvamos uma lista padrão.
     if (Object.keys(novaColecao).length === 0) {
-      novaColecao['Minha Lista Principal'] = []
+      const colecaoInicial = { 'Minha Lista Principal': [] }
+      salvarColecaoDeMangas(colecaoInicial)
+        .then(() => {
+          colecaoDeMangas.value = colecaoInicial
+          listaAtiva.value = 'Minha Lista Principal'
+        })
+        .catch(() => {
+          toast.error('Não foi possível criar a lista inicial.')
+        })
+    } else {
+      colecaoDeMangas.value = novaColecao
+      // Se a lista ativa não existir mais (ex: foi deletada), seleciona a primeira
+      if (!colecaoDeMangas.value[listaAtiva.value]) {
+        listaAtiva.value = Object.keys(novaColecao)[0] || ''
+      }
     }
-    colecaoDeMangas.value = novaColecao
-
-    // Se a lista ativa não existir mais (ex: foi deletada), seleciona a primeira
-    if (!colecaoDeMangas.value[listaAtiva.value]) {
-      listaAtiva.value = Object.keys(novaColecao)[0] || ''
-    }
+    // FIM DA ALTERAÇÃO
   })
 })
 
-// Observa a coleção para atualizar a lista de gêneros
 watch(
   colecaoDeMangas,
   (novaColecao) => {
@@ -288,7 +298,6 @@ onUnmounted(() => {
   }
 })
 
-// NOVAS FUNÇÕES de gerenciamento de lista
 const nomesDasListas = computed(() => Object.keys(colecaoDeMangas.value))
 
 const mangasDaListaAtiva = computed(() => {
@@ -311,7 +320,7 @@ const criarNovaLista = () => {
   const novaColecao = { ...colecaoDeMangas.value, [nome]: [] }
   salvarColecaoDeMangas(novaColecao)
     .then(() => {
-      listaAtiva.value = nome // Seleciona a nova lista criada
+      listaAtiva.value = nome
       novaListaNome.value = ''
       toast.success(`Lista "${nome}" criada com sucesso!`)
     })
@@ -320,7 +329,6 @@ const criarNovaLista = () => {
     })
 }
 
-// LÓGICA DE ADIÇÃO E REMOÇÃO ALTERADA
 const adicionarMangaSelecionado = (manga: Manga) => {
   if (
     mangasDaListaAtiva.value.some(
@@ -359,7 +367,6 @@ const removerManga = (mangaParaRemover: Manga) => {
     })
 }
 
-// O resto das funções (logout, busca, etc.) permanece praticamente igual
 const handleLogout = async () => {
   await fazerLogout()
   router.push('/login')
