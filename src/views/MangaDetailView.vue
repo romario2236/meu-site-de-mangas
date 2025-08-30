@@ -38,6 +38,21 @@
                 >
               </div>
             </div>
+
+            <div class="list-management">
+              <strong>Listas:</strong>
+              <div class="list-selector">
+                <span
+                  v-for="listName in allListNames"
+                  :key="listName"
+                  class="list-tag"
+                  :class="{ selected: mangaInLists.includes(listName) }"
+                  @click="toggleMangaInList(listName)"
+                >
+                  {{ listName }}
+                </span>
+              </div>
+            </div>
             <div><strong>Capítulos:</strong> {{ manga.capitulos }}</div>
             <div class="info-field">
               <strong class="info-label">Capítulos Lidos:</strong>
@@ -217,9 +232,8 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
-// ALTERADO: Importando as funções corretas do firestoreService
 import { getColecaoDeMangas, salvarColecaoDeMangas } from '@/firebase/firestoreService'
-import type { Manga } from '@/types'
+import type { Manga, MangaCollection } from '@/types'
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
 
@@ -234,17 +248,23 @@ const showSelectionModal = ref(false)
 const searchResults = ref<Manga[]>([])
 const hasUnsavedChanges = ref(false)
 
+// NOVO: States para gerir as listas
+const allListNames = ref<string[]>([])
+const mangaInLists = ref<string[]>([])
+
 const route = useRoute()
 const toast = useToast()
 
 const carregarManga = async () => {
-  const colecao = await getColecaoDeMangas() // ALTERADO: Usa a nova função
+  const colecao = await getColecaoDeMangas()
   const mangaSlug = route.params.id as string
   let encontrado: Manga | undefined
 
-  // Procura o mangá em todas as listas da coleção
+  // NOVO: Popula a lista com todos os nomes de listas existentes
+  allListNames.value = Object.keys(colecao)
+  mangaInLists.value = [] // Limpa a lista de participação do mangá
+
   for (const listName in colecao) {
-    // CORRIGIDO: Adicionado o tipo 'Manga' para o parâmetro 'm'
     const mangaNaLista = colecao[listName].find((m: Manga) => {
       if (!m || !m.titulo) return false
       const slug = m.titulo
@@ -253,9 +273,11 @@ const carregarManga = async () => {
         .replace(/^-+|-+$/g, '')
       return slug === mangaSlug
     })
+
     if (mangaNaLista) {
       encontrado = mangaNaLista
-      break
+      // NOVO: Se encontrou o mangá nesta lista, adiciona o nome da lista ao nosso state
+      mangaInLists.value.push(listName)
     }
   }
 
@@ -272,32 +294,55 @@ const carregarManga = async () => {
   hasUnsavedChanges.value = false
 }
 
+// NOVO: Função para adicionar/remover o mangá de uma lista
+const toggleMangaInList = async (listName: string) => {
+  if (!manga.value) return
+
+  const colecao = await getColecaoDeMangas()
+  const targetList = colecao[listName]
+  const mangaIndex = targetList.findIndex((item) => item.titulo === manga.value?.titulo)
+
+  if (mangaIndex > -1) {
+    // Se o mangá existe na lista, remove-o
+    targetList.splice(mangaIndex, 1)
+    toast.info(`"${manga.value.titulo}" removido da lista "${listName}".`)
+  } else {
+    // Se o mangá não existe, adiciona-o
+    targetList.push(manga.value)
+    toast.success(`"${manga.value.titulo}" adicionado à lista "${listName}".`)
+  }
+
+  // Salva a coleção inteira com a modificação
+  try {
+    await salvarColecaoDeMangas(colecao)
+    // Atualiza a UI localmente para refletir a mudança
+    await carregarManga()
+  } catch {
+    toast.error('Erro ao atualizar as listas.')
+  }
+}
+
+// --- O restante do script permanece o mesmo ---
 const updateMangaInDatabase = async () => {
-  const colecao = await getColecaoDeMangas() // ALTERADO: Usa a nova função
+  const colecao = await getColecaoDeMangas()
   const mangaOriginalTitulo = manga.value?.titulo
   let mangaEncontrado = false
-
   if (!mangaOriginalTitulo) {
     toast.error('Não foi possível encontrar o título original do mangá para salvar.')
     return
   }
-
-  // Encontra e atualiza o mangá em todas as listas em que ele existir
   for (const listName in colecao) {
-    // CORRIGIDO: Adicionado o tipo 'Manga' para o parâmetro 'm'
     const index = colecao[listName].findIndex((m: Manga) => m.titulo === mangaOriginalTitulo)
     if (index !== -1) {
       colecao[listName][index] = editedManga.value as Manga
       mangaEncontrado = true
     }
   }
-
   if (mangaEncontrado) {
     try {
-      await salvarColecaoDeMangas(colecao) // ALTERADO: Usa a nova função
+      await salvarColecaoDeMangas(colecao)
       manga.value = { ...editedManga.value } as Manga
     } catch {
-      // CORRIGIDO: Removida a variável 'error' não utilizada
       toast.error('Erro ao salvar alterações no banco de dados.')
       throw new Error('Falha ao salvar a coleção')
     }
@@ -312,7 +357,7 @@ const salvarAlteracoesRapidas = async () => {
     hasUnsavedChanges.value = false
     toast.success('Alterações salvas com sucesso!')
   } catch {
-    /* O erro já é tratado na função `updateMangaInDatabase` */
+    /* erro já tratado */
   }
 }
 const cancelarAlteracoesRapidas = () => {
@@ -324,7 +369,7 @@ const salvarEdicaoCompleta = async () => {
     isEditing.value = false
     toast.success('Mangá atualizado com sucesso!')
   } catch {
-    /* O erro já é tratado na função `updateMangaInDatabase` */
+    /* erro já tratado */
   }
 }
 const openUpdateConfirmation = () => {
@@ -342,7 +387,7 @@ const handleConfirmUpdate = async () => {
   if (!manga.value) return
   isUpdating.value = true
   toast.info(`A procurar por atualizações para "${manga.value.titulo}"...`)
-  const { data: resultados } = await fetchMangaData(manga.value.titulo) // CORRIGIDO: Removida a variável 'error' não utilizada
+  const { data: resultados } = await fetchMangaData(manga.value.titulo)
   isUpdating.value = false
   if (resultados && resultados.length > 0) {
     searchResults.value = resultados
@@ -365,7 +410,7 @@ const handleMangaSelectedForUpdate = async (selectedManga: Manga) => {
     await updateMangaInDatabase()
     toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
   } catch {
-    /* O erro já é tratado na função `updateMangaInDatabase` */
+    /* erro já tratado */
   }
   closeSelectionModal()
 }
@@ -441,12 +486,35 @@ watch(
 </script>
 
 <style scoped>
+/* NOVOS ESTILOS PARA AS TAGS DE LISTA */
+.list-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.list-tag {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: 600;
+  color: var(--subtle-text-color);
+  background-color: var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+.list-tag:hover {
+  color: white;
+  background-color: var(--subtle-text-color);
+}
+.list-tag.selected {
+  background-color: var(--primary-color);
+  color: white;
+  font-weight: bold;
+}
+
+/* ESTILOS EXISTENTES (resumido) */
 .save-btn {
   background-color: var(--save-color);
   color: white;
-}
-.save-btn:hover {
-  background-color: #27ae60;
 }
 .link-edit-group {
   display: grid;
