@@ -30,22 +30,25 @@
         <div class="list-management-section">
           <h3>Minhas Listas</h3>
           <div class="organize-group">
-            <label for="list-select">Lista Atual:</label>
-            <div class="list-selector-group">
-              <select id="list-select" v-model="listaAtiva">
-                <option v-for="listName in nomesDasListas" :key="listName" :value="listName">
-                  {{ listName }}
-                </option>
-              </select>
-              <button
-                class="manage-list-btn"
-                @click="openManageListModal"
-                :disabled="!listaAtiva"
-                title="Gerir lista atual"
+            <div class="filter-container">
+              <span
+                v-for="listName in nomesDasListas"
+                :key="listName"
+                class="filter-tag"
+                :class="{ selected: listName === listaAtiva }"
+                @click="listaAtiva = listName"
               >
-                ⚙️
-              </button>
+                {{ listName }}
+              </span>
             </div>
+            <button
+              class="manage-list-btn"
+              @click="openManageListModal"
+              :disabled="!listaAtiva"
+              title="Gerir lista atual"
+            >
+              Gerir Lista "{{ listaAtiva }}"
+            </button>
           </div>
           <div class="organize-group">
             <label for="new-list-name">Criar Nova Lista:</label>
@@ -230,7 +233,6 @@
       @copy="handleCopyManga"
       @move="handleMoveManga"
     />
-
     <ListActionsModal
       v-if="showManageListModal"
       :list-name="listaAtiva"
@@ -251,29 +253,22 @@ import CardSkeleton from '@/components/CardSkeleton.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
 import ManualAddModal from '@/components/ManualAddModal.vue'
 import MoveCopyModal from '@/components/MoveCopyModal.vue'
+import ListActionsModal from '@/components/ListActionsModal.vue'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
 import type { Manga, MangaCollection } from '@/types'
-// NOVO: Importação do novo modal
-import ListActionsModal from '@/components/ListActionsModal.vue'
 
 const router = useRouter()
 const toast = useToast()
-
 const searchResults = ref<Manga[]>([])
 const showSelectionModal = ref(false)
 const showManualAddModal = ref(false)
-
 const colecaoDeMangas = ref<MangaCollection>({})
 const listaAtiva = ref<string>('')
 const novaListaNome = ref('')
-
 const showMoveCopyModal = ref(false)
 const mangaForMoveCopy = ref<Manga | null>(null)
-
-// NOVO: State para o modal de Gerir Listas
 const showManageListModal = ref(false)
-
 const mangaInput = ref('')
 const todosOsGeneros = ref(new Set<string>())
 const generoSelecionado = ref<string[]>([])
@@ -283,9 +278,7 @@ const sortBy = ref('titulo-asc')
 const isLoading = ref(false)
 const filtroNome = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
-
 let pararDeEscutar: () => void
-
 onMounted(() => {
   pararDeEscutar = escutarColecaoDeMangas((novaColecao) => {
     if (Object.keys(novaColecao).length === 0) {
@@ -302,7 +295,6 @@ onMounted(() => {
     }
   })
 })
-
 watch(
   colecaoDeMangas,
   (novaColecao) => {
@@ -317,49 +309,37 @@ watch(
   },
   { deep: true },
 )
-
 onUnmounted(() => {
   if (pararDeEscutar) {
     pararDeEscutar()
   }
 })
-
-// --- NOVAS FUNÇÕES PARA GERIR LISTAS ---
 const openManageListModal = () => {
   showManageListModal.value = true
 }
-
 const closeManageListModal = () => {
   showManageListModal.value = false
 }
-
 const handleRenameList = (novoNome: string) => {
   if (colecaoDeMangas.value[novoNome]) {
     toast.warning(`A lista "${novoNome}" já existe.`)
     return
   }
-
   const colecaoAntiga = { ...colecaoDeMangas.value }
   const mangasList = colecaoAntiga[listaAtiva.value]
   delete colecaoAntiga[listaAtiva.value]
-
   const novaColecao = { ...colecaoAntiga, [novoNome]: mangasList }
-
-  salvarColecaoDeMangas(novaColecao)
-    .then(() => {
-      toast.success(`Lista "${listaAtiva.value}" renomeada para "${novoNome}".`)
-      listaAtiva.value = novoNome // Atualiza a lista ativa para o novo nome
-      closeManageListModal()
-    })
-    .catch(() => toast.error('Erro ao renomear a lista.'))
+  salvarColecaoDeMangas(novaColecao).then(() => {
+    toast.success(`Lista "${listaAtiva.value}" renomeada para "${novoNome}".`)
+    listaAtiva.value = novoNome
+    closeManageListModal()
+  })
 }
-
 const handleDeleteList = () => {
   if (nomesDasListas.value.length <= 1) {
     toast.error('Não é possível deletar a sua única lista.')
     return
   }
-
   if (
     confirm(
       `Tem a certeza de que quer deletar a lista "${listaAtiva.value}"? Esta ação não pode ser desfeita.`,
@@ -367,18 +347,12 @@ const handleDeleteList = () => {
   ) {
     const novaColecao = { ...colecaoDeMangas.value }
     delete novaColecao[listaAtiva.value]
-
-    salvarColecaoDeMangas(novaColecao)
-      .then(() => {
-        toast.info(`A lista "${listaAtiva.value}" foi deletada.`)
-        // A listaAtiva será atualizada automaticamente pelo 'watch' para a primeira lista disponível
-        closeManageListModal()
-      })
-      .catch(() => toast.error('Erro ao deletar a lista.'))
+    salvarColecaoDeMangas(novaColecao).then(() => {
+      toast.info(`A lista "${listaAtiva.value}" foi deletada.`)
+      closeManageListModal()
+    })
   }
 }
-// --- FIM DAS NOVAS FUNÇÕES ---
-
 const openMoveCopyModal = (manga: Manga) => {
   mangaForMoveCopy.value = manga
   showMoveCopyModal.value = true
@@ -608,22 +582,14 @@ const setTipo = (tipo: string) => {
 
 <style scoped>
 /* NOVOS ESTILOS */
-.list-selector-group {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.list-selector-group select {
-  flex-grow: 1;
-}
 .manage-list-btn {
-  flex-shrink: 0;
-  width: 50px;
-  height: 45px; /* Alinha com a altura do select */
-  font-size: 1.5rem;
-  padding: 0;
-  border: 1px solid var(--border-color);
+  width: 100%;
+  margin-top: 15px;
+  padding: 8px;
+  font-size: 0.9rem;
   background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  text-align: center;
 }
 .manage-list-btn:disabled {
   opacity: 0.5;
