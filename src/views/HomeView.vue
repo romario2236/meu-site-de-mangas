@@ -1,4 +1,7 @@
 <template>
+  <h1 style="color: red; text-align: center; font-size: 2rem; padding: 20px">
+    VERSÃO DE TESTE CARREGADA
+  </h1>
   <div class="home-wrapper">
     <div class="header-section">
       <div class="header-top">
