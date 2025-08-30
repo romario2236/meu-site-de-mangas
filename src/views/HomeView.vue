@@ -31,11 +31,21 @@
           <h3>Minhas Listas</h3>
           <div class="organize-group">
             <label for="list-select">Lista Atual:</label>
-            <select id="list-select" v-model="listaAtiva">
-              <option v-for="listName in nomesDasListas" :key="listName" :value="listName">
-                {{ listName }}
-              </option>
-            </select>
+            <div class="list-selector-group">
+              <select id="list-select" v-model="listaAtiva">
+                <option v-for="listName in nomesDasListas" :key="listName" :value="listName">
+                  {{ listName }}
+                </option>
+              </select>
+              <button
+                class="manage-list-btn"
+                @click="openManageListModal"
+                :disabled="!listaAtiva"
+                title="Gerir lista atual"
+              >
+                ⚙️
+              </button>
+            </div>
           </div>
           <div class="organize-group">
             <label for="new-list-name">Criar Nova Lista:</label>
@@ -211,7 +221,6 @@
       @close="showManualAddModal = false"
       @save="adicionarMangaManual"
     />
-
     <MoveCopyModal
       v-if="showMoveCopyModal"
       :manga-to-move="mangaForMoveCopy"
@@ -220,6 +229,14 @@
       @close="closeMoveCopyModal"
       @copy="handleCopyManga"
       @move="handleMoveManga"
+    />
+
+    <ListActionsModal
+      v-if="showManageListModal"
+      :list-name="listaAtiva"
+      @close="closeManageListModal"
+      @rename="handleRenameList"
+      @delete="handleDeleteList"
     />
   </div>
 </template>
@@ -233,11 +250,12 @@ import MangaCard from '@/components/MangaCard.vue'
 import CardSkeleton from '@/components/CardSkeleton.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
 import ManualAddModal from '@/components/ManualAddModal.vue'
+import MoveCopyModal from '@/components/MoveCopyModal.vue'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
 import type { Manga, MangaCollection } from '@/types'
 // NOVO: Importação do novo modal
-import MoveCopyModal from '@/components/MoveCopyModal.vue'
+import ListActionsModal from '@/components/ListActionsModal.vue'
 
 const router = useRouter()
 const toast = useToast()
@@ -250,9 +268,11 @@ const colecaoDeMangas = ref<MangaCollection>({})
 const listaAtiva = ref<string>('')
 const novaListaNome = ref('')
 
-// NOVO: State para o modal de Mover/Copiar
 const showMoveCopyModal = ref(false)
 const mangaForMoveCopy = ref<Manga | null>(null)
+
+// NOVO: State para o modal de Gerir Listas
+const showManageListModal = ref(false)
 
 const mangaInput = ref('')
 const todosOsGeneros = ref(new Set<string>())
@@ -304,86 +324,119 @@ onUnmounted(() => {
   }
 })
 
-// --- NOVAS FUNÇÕES PARA O MODAL DE MOVER/COPIAR ---
+// --- NOVAS FUNÇÕES PARA GERIR LISTAS ---
+const openManageListModal = () => {
+  showManageListModal.value = true
+}
+
+const closeManageListModal = () => {
+  showManageListModal.value = false
+}
+
+const handleRenameList = (novoNome: string) => {
+  if (colecaoDeMangas.value[novoNome]) {
+    toast.warning(`A lista "${novoNome}" já existe.`)
+    return
+  }
+
+  const colecaoAntiga = { ...colecaoDeMangas.value }
+  const mangasList = colecaoAntiga[listaAtiva.value]
+  delete colecaoAntiga[listaAtiva.value]
+
+  const novaColecao = { ...colecaoAntiga, [novoNome]: mangasList }
+
+  salvarColecaoDeMangas(novaColecao)
+    .then(() => {
+      toast.success(`Lista "${listaAtiva.value}" renomeada para "${novoNome}".`)
+      listaAtiva.value = novoNome // Atualiza a lista ativa para o novo nome
+      closeManageListModal()
+    })
+    .catch(() => toast.error('Erro ao renomear a lista.'))
+}
+
+const handleDeleteList = () => {
+  if (nomesDasListas.value.length <= 1) {
+    toast.error('Não é possível deletar a sua única lista.')
+    return
+  }
+
+  if (
+    confirm(
+      `Tem a certeza de que quer deletar a lista "${listaAtiva.value}"? Esta ação não pode ser desfeita.`,
+    )
+  ) {
+    const novaColecao = { ...colecaoDeMangas.value }
+    delete novaColecao[listaAtiva.value]
+
+    salvarColecaoDeMangas(novaColecao)
+      .then(() => {
+        toast.info(`A lista "${listaAtiva.value}" foi deletada.`)
+        // A listaAtiva será atualizada automaticamente pelo 'watch' para a primeira lista disponível
+        closeManageListModal()
+      })
+      .catch(() => toast.error('Erro ao deletar a lista.'))
+  }
+}
+// --- FIM DAS NOVAS FUNÇÕES ---
+
 const openMoveCopyModal = (manga: Manga) => {
   mangaForMoveCopy.value = manga
   showMoveCopyModal.value = true
 }
-
 const closeMoveCopyModal = () => {
   showMoveCopyModal.value = false
   mangaForMoveCopy.value = null
 }
-
 const handleCopyManga = (destinationList: string) => {
   if (!mangaForMoveCopy.value) return
-
   const destination = colecaoDeMangas.value[destinationList]
   const manga = mangaForMoveCopy.value
-
   if (destination.some((item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase())) {
     toast.warning(`"${manga.titulo}" já existe na lista "${destinationList}".`)
     return
   }
-
   const novaListaDestino = [...destination, manga]
   const novaColecao = { ...colecaoDeMangas.value, [destinationList]: novaListaDestino }
-
-  salvarColecaoDeMangas(novaColecao)
-    .then(() => {
-      toast.success(`"${manga.titulo}" copiado para a lista "${destinationList}".`)
-      closeMoveCopyModal()
-    })
-    .catch(() => toast.error('Erro ao copiar o mangá.'))
+  salvarColecaoDeMangas(novaColecao).then(() => {
+    toast.success(`"${manga.titulo}" copiado para a lista "${destinationList}".`)
+    closeMoveCopyModal()
+  })
 }
-
 const handleMoveManga = (destinationList: string) => {
   if (!mangaForMoveCopy.value) return
-
   const destination = colecaoDeMangas.value[destinationList]
   const source = mangasDaListaAtiva.value
   const manga = mangaForMoveCopy.value
-
   if (destination.some((item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase())) {
     toast.warning(
       `"${manga.titulo}" já existe na lista "${destinationList}". Apenas removeremos da lista atual.`,
     )
   }
-
   const novaListaDestino = destination.some(
     (item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase(),
   )
     ? [...destination]
     : [...destination, manga]
-
   const novaListaOrigem = source.filter(
     (item) => item.titulo.toLowerCase() !== manga.titulo.toLowerCase(),
   )
-
   const novaColecao = {
     ...colecaoDeMangas.value,
     [destinationList]: novaListaDestino,
     [listaAtiva.value]: novaListaOrigem,
   }
-
-  salvarColecaoDeMangas(novaColecao)
-    .then(() => {
-      toast.success(`"${manga.titulo}" movido de "${listaAtiva.value}" para "${destinationList}".`)
-      closeMoveCopyModal()
-    })
-    .catch(() => toast.error('Erro ao mover o mangá.'))
+  salvarColecaoDeMangas(novaColecao).then(() => {
+    toast.success(`"${manga.titulo}" movido de "${listaAtiva.value}" para "${destinationList}".`)
+    closeMoveCopyModal()
+  })
 }
-// --- FIM DAS NOVAS FUNÇÕES ---
-
 const nomesDasListas = computed(() => Object.keys(colecaoDeMangas.value))
-
 const mangasDaListaAtiva = computed(() => {
   if (!listaAtiva.value || !colecaoDeMangas.value[listaAtiva.value]) {
     return []
   }
   return colecaoDeMangas.value[listaAtiva.value]
 })
-
 const criarNovaLista = () => {
   const nome = novaListaNome.value.trim()
   if (!nome) {
@@ -401,7 +454,6 @@ const criarNovaLista = () => {
     toast.success(`Lista "${nome}" criada com sucesso!`)
   })
 }
-
 const adicionarMangaSelecionado = (manga: Manga) => {
   if (
     mangasDaListaAtiva.value.some(
@@ -419,7 +471,6 @@ const adicionarMangaSelecionado = (manga: Manga) => {
   mangaInput.value = ''
   closeSelectionModal()
 }
-
 const removerManga = (mangaParaRemover: Manga) => {
   const novaListaDeMangas = mangasDaListaAtiva.value.filter(
     (manga) => manga.titulo !== mangaParaRemover.titulo,
@@ -429,7 +480,6 @@ const removerManga = (mangaParaRemover: Manga) => {
     toast.info(`"${mangaParaRemover.titulo}" foi removido da lista "${listaAtiva.value}".`)
   })
 }
-
 const handleLogout = async () => {
   await fazerLogout()
   router.push('/login')
@@ -445,7 +495,6 @@ const closeSelectionModal = () => {
 const triggerImportar = () => {
   fileInput.value?.click()
 }
-
 const buscarManga = async () => {
   const nomeManga = mangaInput.value.trim()
   if (nomeManga === '') return
@@ -463,7 +512,6 @@ const buscarManga = async () => {
     toast.info('Nenhum resultado encontrado para sua busca.')
   }
 }
-
 const exportarLista = () => {
   if (mangasDaListaAtiva.value.length === 0) {
     toast.info('A lista atual está vazia. Adicione mangás para exportar.')
@@ -479,7 +527,6 @@ const exportarLista = () => {
   URL.revokeObjectURL(url)
   toast.success(`Lista "${listaAtiva.value}" exportada com sucesso!`)
 }
-
 const importarLista = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
@@ -509,7 +556,6 @@ const importarLista = (event: Event) => {
   }
   reader.readAsText(file)
 }
-
 const mangasFiltradosEOrdenados = computed(() => {
   let mangas = [...mangasDaListaAtiva.value]
   const termoBusca = filtroNome.value.trim().toLowerCase()
@@ -540,7 +586,6 @@ const mangasFiltradosEOrdenados = computed(() => {
   })
   return mangas
 })
-
 const todosOsGenerosOrdenados = computed(() => Array.from(todosOsGeneros.value).sort())
 const toggleGenero = (genero: string) => {
   const index = generoSelecionado.value.indexOf(genero)
@@ -562,6 +607,30 @@ const setTipo = (tipo: string) => {
 </script>
 
 <style scoped>
+/* NOVOS ESTILOS */
+.list-selector-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.list-selector-group select {
+  flex-grow: 1;
+}
+.manage-list-btn {
+  flex-shrink: 0;
+  width: 50px;
+  height: 45px; /* Alinha com a altura do select */
+  font-size: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+}
+.manage-list-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ESTILOS EXISTENTES (resumido) */
 .list-management-section {
   border-bottom: 2px solid var(--border-color);
   padding-bottom: 20px;
