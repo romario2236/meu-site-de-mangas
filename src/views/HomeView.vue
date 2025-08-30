@@ -51,7 +51,6 @@
             </div>
           </div>
         </div>
-
         <h3>Filtros e Ordenação</h3>
         <div class="organize-group">
           <label for="search-local">Pesquisar por Nome:</label>
@@ -175,9 +174,8 @@
               :key="genero"
               :class="{ selected: generoSelecionado.includes(genero) }"
               @click="toggleGenero(genero)"
+              >{{ genero }}</span
             >
-              {{ genero }}
-            </span>
           </div>
         </div>
       </aside>
@@ -194,6 +192,7 @@
               :key="manga.titulo"
               :manga="manga"
               @removerManga="removerManga"
+              @openMoveCopy="openMoveCopyModal"
             />
           </template>
         </ul>
@@ -212,6 +211,16 @@
       @close="showManualAddModal = false"
       @save="adicionarMangaManual"
     />
+
+    <MoveCopyModal
+      v-if="showMoveCopyModal"
+      :manga-to-move="mangaForMoveCopy"
+      :all-list-names="nomesDasListas"
+      :current-list-name="listaAtiva"
+      @close="closeMoveCopyModal"
+      @copy="handleCopyManga"
+      @move="handleMoveManga"
+    />
   </div>
 </template>
 
@@ -227,6 +236,8 @@ import ManualAddModal from '@/components/ManualAddModal.vue'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
 import type { Manga, MangaCollection } from '@/types'
+// NOVO: Importação do novo modal
+import MoveCopyModal from '@/components/MoveCopyModal.vue'
 
 const router = useRouter()
 const toast = useToast()
@@ -238,6 +249,10 @@ const showManualAddModal = ref(false)
 const colecaoDeMangas = ref<MangaCollection>({})
 const listaAtiva = ref<string>('')
 const novaListaNome = ref('')
+
+// NOVO: State para o modal de Mover/Copiar
+const showMoveCopyModal = ref(false)
+const mangaForMoveCopy = ref<Manga | null>(null)
 
 const mangaInput = ref('')
 const todosOsGeneros = ref(new Set<string>())
@@ -255,14 +270,10 @@ onMounted(() => {
   pararDeEscutar = escutarColecaoDeMangas((novaColecao) => {
     if (Object.keys(novaColecao).length === 0) {
       const colecaoInicial = { 'Minha Lista Principal': [] }
-      salvarColecaoDeMangas(colecaoInicial)
-        .then(() => {
-          colecaoDeMangas.value = colecaoInicial
-          listaAtiva.value = 'Minha Lista Principal'
-        })
-        .catch(() => {
-          toast.error('Não foi possível criar a lista inicial.')
-        })
+      salvarColecaoDeMangas(colecaoInicial).then(() => {
+        colecaoDeMangas.value = colecaoInicial
+        listaAtiva.value = 'Minha Lista Principal'
+      })
     } else {
       colecaoDeMangas.value = novaColecao
       if (!listaAtiva.value || !colecaoDeMangas.value[listaAtiva.value]) {
@@ -293,6 +304,77 @@ onUnmounted(() => {
   }
 })
 
+// --- NOVAS FUNÇÕES PARA O MODAL DE MOVER/COPIAR ---
+const openMoveCopyModal = (manga: Manga) => {
+  mangaForMoveCopy.value = manga
+  showMoveCopyModal.value = true
+}
+
+const closeMoveCopyModal = () => {
+  showMoveCopyModal.value = false
+  mangaForMoveCopy.value = null
+}
+
+const handleCopyManga = (destinationList: string) => {
+  if (!mangaForMoveCopy.value) return
+
+  const destination = colecaoDeMangas.value[destinationList]
+  const manga = mangaForMoveCopy.value
+
+  if (destination.some((item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase())) {
+    toast.warning(`"${manga.titulo}" já existe na lista "${destinationList}".`)
+    return
+  }
+
+  const novaListaDestino = [...destination, manga]
+  const novaColecao = { ...colecaoDeMangas.value, [destinationList]: novaListaDestino }
+
+  salvarColecaoDeMangas(novaColecao)
+    .then(() => {
+      toast.success(`"${manga.titulo}" copiado para a lista "${destinationList}".`)
+      closeMoveCopyModal()
+    })
+    .catch(() => toast.error('Erro ao copiar o mangá.'))
+}
+
+const handleMoveManga = (destinationList: string) => {
+  if (!mangaForMoveCopy.value) return
+
+  const destination = colecaoDeMangas.value[destinationList]
+  const source = mangasDaListaAtiva.value
+  const manga = mangaForMoveCopy.value
+
+  if (destination.some((item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase())) {
+    toast.warning(
+      `"${manga.titulo}" já existe na lista "${destinationList}". Apenas removeremos da lista atual.`,
+    )
+  }
+
+  const novaListaDestino = destination.some(
+    (item) => item.titulo.toLowerCase() === manga.titulo.toLowerCase(),
+  )
+    ? [...destination]
+    : [...destination, manga]
+
+  const novaListaOrigem = source.filter(
+    (item) => item.titulo.toLowerCase() !== manga.titulo.toLowerCase(),
+  )
+
+  const novaColecao = {
+    ...colecaoDeMangas.value,
+    [destinationList]: novaListaDestino,
+    [listaAtiva.value]: novaListaOrigem,
+  }
+
+  salvarColecaoDeMangas(novaColecao)
+    .then(() => {
+      toast.success(`"${manga.titulo}" movido de "${listaAtiva.value}" para "${destinationList}".`)
+      closeMoveCopyModal()
+    })
+    .catch(() => toast.error('Erro ao mover o mangá.'))
+}
+// --- FIM DAS NOVAS FUNÇÕES ---
+
 const nomesDasListas = computed(() => Object.keys(colecaoDeMangas.value))
 
 const mangasDaListaAtiva = computed(() => {
@@ -313,15 +395,11 @@ const criarNovaLista = () => {
     return
   }
   const novaColecao = { ...colecaoDeMangas.value, [nome]: [] }
-  salvarColecaoDeMangas(novaColecao)
-    .then(() => {
-      listaAtiva.value = nome
-      novaListaNome.value = ''
-      toast.success(`Lista "${nome}" criada com sucesso!`)
-    })
-    .catch(() => {
-      toast.error('Erro ao criar a nova lista.')
-    })
+  salvarColecaoDeMangas(novaColecao).then(() => {
+    listaAtiva.value = nome
+    novaListaNome.value = ''
+    toast.success(`Lista "${nome}" criada com sucesso!`)
+  })
 }
 
 const adicionarMangaSelecionado = (manga: Manga) => {
@@ -334,14 +412,9 @@ const adicionarMangaSelecionado = (manga: Manga) => {
   } else {
     const novaListaDeMangas = [...mangasDaListaAtiva.value, manga]
     const novaColecao = { ...colecaoDeMangas.value, [listaAtiva.value]: novaListaDeMangas }
-    salvarColecaoDeMangas(novaColecao)
-      .then(() => {
-        toast.success(`"${manga.titulo}" foi adicionado à lista "${listaAtiva.value}"!`)
-      })
-      .catch((err) => {
-        toast.error('Erro ao salvar o mangá.')
-        console.error(err)
-      })
+    salvarColecaoDeMangas(novaColecao).then(() => {
+      toast.success(`"${manga.titulo}" foi adicionado à lista "${listaAtiva.value}"!`)
+    })
   }
   mangaInput.value = ''
   closeSelectionModal()
@@ -352,14 +425,9 @@ const removerManga = (mangaParaRemover: Manga) => {
     (manga) => manga.titulo !== mangaParaRemover.titulo,
   )
   const novaColecao = { ...colecaoDeMangas.value, [listaAtiva.value]: novaListaDeMangas }
-  salvarColecaoDeMangas(novaColecao)
-    .then(() => {
-      toast.info(`"${mangaParaRemover.titulo}" foi removido da lista "${listaAtiva.value}".`)
-    })
-    .catch((err) => {
-      toast.error('Erro ao remover o mangá.')
-      console.error(err)
-    })
+  salvarColecaoDeMangas(novaColecao).then(() => {
+    toast.info(`"${mangaParaRemover.titulo}" foi removido da lista "${listaAtiva.value}".`)
+  })
 }
 
 const handleLogout = async () => {
@@ -382,7 +450,7 @@ const buscarManga = async () => {
   const nomeManga = mangaInput.value.trim()
   if (nomeManga === '') return
   isLoading.value = true
-  const { data: resultados } = await fetchMangaData(nomeManga) // Removido 'error' não utilizado
+  const { data: resultados } = await fetchMangaData(nomeManga)
   isLoading.value = false
   if (resultados && resultados.length > 0) {
     if (resultados.length > 1) {
@@ -430,16 +498,10 @@ const importarLista = (event: Event) => {
       }
 
       const novaColecao = { ...colecaoDeMangas.value, [listaAtiva.value]: novaListaImportada }
-      salvarColecaoDeMangas(novaColecao)
-        .then(() => {
-          toast.success(`Lista importada para "${listaAtiva.value}" com sucesso!`)
-        })
-        .catch((err) => {
-          toast.error('Erro ao salvar a lista importada.')
-          console.error(err)
-        })
+      salvarColecaoDeMangas(novaColecao).then(() => {
+        toast.success(`Lista importada para "${listaAtiva.value}" com sucesso!`)
+      })
     } catch {
-      // Removido 'error' não utilizado
       toast.error('Falha ao importar. Verifique se o arquivo é um JSON válido.')
     } finally {
       if (target) target.value = ''
@@ -500,7 +562,6 @@ const setTipo = (tipo: string) => {
 </script>
 
 <style scoped>
-/* NOVOS ESTILOS PARA GERENCIAMENTO DE LISTAS */
 .list-management-section {
   border-bottom: 2px solid var(--border-color);
   padding-bottom: 20px;
@@ -518,8 +579,6 @@ const setTipo = (tipo: string) => {
   width: 50px;
   font-size: 1.5rem;
 }
-
-/* ESTILOS EXISTENTES */
 .header-top {
   display: flex;
   justify-content: center;
