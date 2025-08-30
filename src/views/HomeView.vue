@@ -64,6 +64,7 @@
             </div>
           </div>
         </div>
+
         <h3>Filtros e Ordenação</h3>
         <div class="organize-group">
           <label for="search-local">Pesquisar por Nome:</label>
@@ -404,7 +405,17 @@ const handleMoveManga = (destinationList: string) => {
     closeMoveCopyModal()
   })
 }
-const nomesDasListas = computed(() => Object.keys(colecaoDeMangas.value))
+
+// ALTERADO: Adicionada lógica de ordenação para as listas
+const nomesDasListas = computed(() => {
+  const keys = Object.keys(colecaoDeMangas.value)
+  return keys.sort((a, b) => {
+    if (a === 'Minha Lista Principal') return -1 // "Minha Lista Principal" vem sempre primeiro
+    if (b === 'Minha Lista Principal') return 1
+    return a.localeCompare(b) // Ordena o resto alfabeticamente
+  })
+})
+
 const mangasDaListaAtiva = computed(() => {
   if (!listaAtiva.value || !colecaoDeMangas.value[listaAtiva.value]) {
     return []
