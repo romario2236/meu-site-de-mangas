@@ -49,7 +49,6 @@
             </div>
             <div><strong>Gêneros:</strong> {{ manga.generos }}</div>
             <div><strong>Nomes Alternativos:</strong> {{ manga.nomesAlternativos }}</div>
-
             <div v-if="manga.linksLeitura && manga.linksLeitura.length > 0">
               <strong>Onde Ler:</strong>
               <div class="read-links-container">
@@ -84,7 +83,6 @@
             class="modal-input"
             placeholder="https://exemplo.com/imagem.jpg"
           />
-
           <label>Links para Leitura</label>
           <div
             v-for="(link, index) in editedManga.linksLeitura"
@@ -219,8 +217,9 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { fetchMangaData } from '@/composables/useMangaApi'
-import { getListaDeMangas, salvarListaDeMangas } from '@/firebase/firestoreService'
-import type { Manga } from '@/types' // A importação da Manga já inclui a de LinkLeitura
+// ALTERADO: Importando as funções corretas do firestoreService
+import { getColecaoDeMangas, salvarColecaoDeMangas } from '@/firebase/firestoreService'
+import type { Manga } from '@/types'
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
 import MangaSelectionModal from '@/components/MangaSelectionModal.vue'
 
@@ -239,19 +238,28 @@ const route = useRoute()
 const toast = useToast()
 
 const carregarManga = async () => {
-  const mangasSalvos = await getListaDeMangas()
+  const colecao = await getColecaoDeMangas() // ALTERADO: Usa a nova função
   const mangaSlug = route.params.id as string
-  const encontrado = mangasSalvos.find((m) => {
-    if (!m || !m.titulo) return false
-    const slug = m.titulo
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-    return slug === mangaSlug
-  })
+  let encontrado: Manga | undefined
+
+  // Procura o mangá em todas as listas da coleção
+  for (const listName in colecao) {
+    // CORRIGIDO: Adicionado o tipo 'Manga' para o parâmetro 'm'
+    const mangaNaLista = colecao[listName].find((m: Manga) => {
+      if (!m || !m.titulo) return false
+      const slug = m.titulo
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+      return slug === mangaSlug
+    })
+    if (mangaNaLista) {
+      encontrado = mangaNaLista
+      break
+    }
+  }
 
   if (encontrado) {
-    // Garante que linksLeitura seja sempre um array
     if (!Array.isArray(encontrado.linksLeitura)) {
       encontrado.linksLeitura = []
     }
@@ -264,39 +272,38 @@ const carregarManga = async () => {
   hasUnsavedChanges.value = false
 }
 
-// ... (o resto do script continua o mesmo, mas a função addLink e removeLink precisam de ajustes)
-
-const addLink = () => {
-  if (!editedManga.value.linksLeitura) {
-    editedManga.value.linksLeitura = []
-  }
-  // ALTERADO: Adiciona um objeto com nome e url
-  editedManga.value.linksLeitura.push({ nome: '', url: '' })
-}
-
-const removeLink = (index: number) => {
-  if (editedManga.value.linksLeitura) {
-    editedManga.value.linksLeitura.splice(index, 1)
-  }
-}
-
-// --- O restante do script permanece o mesmo ---
 const updateMangaInDatabase = async () => {
-  const mangasSalvos = await getListaDeMangas()
-  const index = mangasSalvos.findIndex((m) => m.titulo === manga.value?.titulo)
+  const colecao = await getColecaoDeMangas() // ALTERADO: Usa a nova função
+  const mangaOriginalTitulo = manga.value?.titulo
+  let mangaEncontrado = false
 
-  if (index !== -1 && manga.value) {
-    mangasSalvos[index] = editedManga.value as Manga
+  if (!mangaOriginalTitulo) {
+    toast.error('Não foi possível encontrar o título original do mangá para salvar.')
+    return
+  }
+
+  // Encontra e atualiza o mangá em todas as listas em que ele existir
+  for (const listName in colecao) {
+    // CORRIGIDO: Adicionado o tipo 'Manga' para o parâmetro 'm'
+    const index = colecao[listName].findIndex((m: Manga) => m.titulo === mangaOriginalTitulo)
+    if (index !== -1) {
+      colecao[listName][index] = editedManga.value as Manga
+      mangaEncontrado = true
+    }
+  }
+
+  if (mangaEncontrado) {
     try {
-      await salvarListaDeMangas(mangasSalvos)
+      await salvarColecaoDeMangas(colecao) // ALTERADO: Usa a nova função
       manga.value = { ...editedManga.value } as Manga
-    } catch (error) {
+    } catch {
+      // CORRIGIDO: Removida a variável 'error' não utilizada
       toast.error('Erro ao salvar alterações no banco de dados.')
-      throw error
+      throw new Error('Falha ao salvar a coleção')
     }
   } else {
-    toast.error('Erro ao encontrar o mangá para salvar.')
-    throw new Error('Manga não encontrado na lista para atualização.')
+    toast.error('Erro ao encontrar o mangá para salvar nas suas listas.')
+    throw new Error('Manga não encontrado na coleção para atualização.')
   }
 }
 const salvarAlteracoesRapidas = async () => {
@@ -304,7 +311,9 @@ const salvarAlteracoesRapidas = async () => {
     await updateMangaInDatabase()
     hasUnsavedChanges.value = false
     toast.success('Alterações salvas com sucesso!')
-  } catch (error) {}
+  } catch {
+    /* O erro já é tratado na função `updateMangaInDatabase` */
+  }
 }
 const cancelarAlteracoesRapidas = () => {
   editedManga.value = JSON.parse(JSON.stringify(manga.value || {}))
@@ -314,7 +323,9 @@ const salvarEdicaoCompleta = async () => {
     await updateMangaInDatabase()
     isEditing.value = false
     toast.success('Mangá atualizado com sucesso!')
-  } catch (error) {}
+  } catch {
+    /* O erro já é tratado na função `updateMangaInDatabase` */
+  }
 }
 const openUpdateConfirmation = () => {
   if (!manga.value) return
@@ -331,12 +342,8 @@ const handleConfirmUpdate = async () => {
   if (!manga.value) return
   isUpdating.value = true
   toast.info(`A procurar por atualizações para "${manga.value.titulo}"...`)
-  const { data: resultados, error } = await fetchMangaData(manga.value.titulo)
+  const { data: resultados } = await fetchMangaData(manga.value.titulo) // CORRIGIDO: Removida a variável 'error' não utilizada
   isUpdating.value = false
-  if (error) {
-    toast.error('Falha ao procurar por atualizações.')
-    return
-  }
   if (resultados && resultados.length > 0) {
     searchResults.value = resultados
     showSelectionModal.value = true
@@ -357,7 +364,9 @@ const handleMangaSelectedForUpdate = async (selectedManga: Manga) => {
   try {
     await updateMangaInDatabase()
     toast.success(`"${manga.value.titulo}" foi atualizado com sucesso!`)
-  } catch (error) {}
+  } catch {
+    /* O erro já é tratado na função `updateMangaInDatabase` */
+  }
   closeSelectionModal()
 }
 const closeSelectionModal = () => {
@@ -396,6 +405,17 @@ const decrementarCapitulo = () => {
     editedManga.value.capitulosLidos--
   }
 }
+const addLink = () => {
+  if (!editedManga.value.linksLeitura) {
+    editedManga.value.linksLeitura = []
+  }
+  editedManga.value.linksLeitura.push({ nome: '', url: '' })
+}
+const removeLink = (index: number) => {
+  if (editedManga.value.linksLeitura) {
+    editedManga.value.linksLeitura.splice(index, 1)
+  }
+}
 watch(
   editedManga,
   (newValue) => {
@@ -421,7 +441,13 @@ watch(
 </script>
 
 <style scoped>
-/* ESTILOS NOVOS E ALTERADOS */
+.save-btn {
+  background-color: var(--save-color);
+  color: white;
+}
+.save-btn:hover {
+  background-color: #27ae60;
+}
 .link-edit-group {
   display: grid;
   grid-template-columns: 1fr 1.5fr auto;
@@ -451,15 +477,6 @@ watch(
   margin-bottom: 15px;
   display: inline-block;
   width: auto;
-}
-
-/* ESTILOS EXISTENTES */
-.save-btn {
-  background-color: var(--save-color);
-  color: white;
-}
-.save-btn:hover {
-  background-color: #27ae60;
 }
 .read-links-container {
   display: flex;

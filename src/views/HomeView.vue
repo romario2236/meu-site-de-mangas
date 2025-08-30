@@ -1,7 +1,4 @@
 <template>
-  <h1 style="color: red; text-align: center; font-size: 2rem; padding: 20px">
-    VERSÃO DE TESTE CARREGADA
-  </h1>
   <div class="home-wrapper">
     <div class="header-section">
       <div class="header-top">
@@ -385,11 +382,9 @@ const buscarManga = async () => {
   const nomeManga = mangaInput.value.trim()
   if (nomeManga === '') return
   isLoading.value = true
-  const { data: resultados, error } = await fetchMangaData(nomeManga)
+  const { data: resultados } = await fetchMangaData(nomeManga) // Removido 'error' não utilizado
   isLoading.value = false
-  if (error) {
-    toast.warning(error)
-  } else if (resultados && resultados.length > 0) {
+  if (resultados && resultados.length > 0) {
     if (resultados.length > 1) {
       searchResults.value = resultados
       showSelectionModal.value = true
@@ -443,7 +438,8 @@ const importarLista = (event: Event) => {
           toast.error('Erro ao salvar a lista importada.')
           console.error(err)
         })
-    } catch (error) {
+    } catch {
+      // Removido 'error' não utilizado
       toast.error('Falha ao importar. Verifique se o arquivo é um JSON válido.')
     } finally {
       if (target) target.value = ''
