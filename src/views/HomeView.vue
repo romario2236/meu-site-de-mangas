@@ -253,29 +253,43 @@ let pararDeEscutar: () => void
 
 onMounted(() => {
   pararDeEscutar = escutarColecaoDeMangas((novaColecao) => {
-    // INÍCIO DA ALTERAÇÃO
-    // Se a coleção retornada do banco de dados estiver vazia,
-    // criamos e salvamos uma lista padrão.
+    // INÍCIO DO CONSOLE.LOG
+    console.log(
+      'Callback do Firestore recebido com a coleção:',
+      JSON.parse(JSON.stringify(novaColecao)),
+    )
+    // FIM DO CONSOLE.LOG
+
     if (Object.keys(novaColecao).length === 0) {
+      console.log('Nenhuma lista encontrada, criando a lista padrão...')
       const colecaoInicial = { 'Minha Lista Principal': [] }
       salvarColecaoDeMangas(colecaoInicial)
         .then(() => {
+          console.log('Lista padrão salva no Firestore.')
           colecaoDeMangas.value = colecaoInicial
           listaAtiva.value = 'Minha Lista Principal'
         })
-        .catch(() => {
+        .catch((err) => {
+          console.error('Erro ao salvar a lista inicial:', err)
           toast.error('Não foi possível criar a lista inicial.')
         })
     } else {
+      console.log('Listas encontradas, atualizando o estado local.')
       colecaoDeMangas.value = novaColecao
-      // Se a lista ativa não existir mais (ex: foi deletada), seleciona a primeira
       if (!colecaoDeMangas.value[listaAtiva.value]) {
         listaAtiva.value = Object.keys(novaColecao)[0] || ''
       }
     }
-    // FIM DA ALTERAÇÃO
   })
 })
+
+const nomesDasListas = computed(() => Object.keys(colecaoDeMangas.value))
+
+// INÍCIO DO CONSOLE.LOG
+watch(nomesDasListas, (novosNomes) => {
+  console.log('A lista de nomes para o dropdown foi atualizada para:', novosNomes)
+})
+// FIM DO CONSOLE.LOG
 
 watch(
   colecaoDeMangas,
@@ -297,8 +311,6 @@ onUnmounted(() => {
     pararDeEscutar()
   }
 })
-
-const nomesDasListas = computed(() => Object.keys(colecaoDeMangas.value))
 
 const mangasDaListaAtiva = computed(() => {
   if (!listaAtiva.value || !colecaoDeMangas.value[listaAtiva.value]) {
